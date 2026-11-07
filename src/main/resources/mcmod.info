@@ -1,0 +1,16 @@
+[
+    {
+      "modid": "${modId}",
+      "name": "${modName}",
+      "description": "Horizon debug mod: file-driven command bridges for the dedicated server and the game client, plus diagnostic commands (TPS compare, dimension list, broadcast test). Ported from the AEMobile debug tooling.",
+      "version": "${modVersion}",
+      "mcversion": "${minecraftVersion}",
+      "url": "https://github.com/dsmnh/HorizonDebug",
+      "updateUrl": "",
+      "authorList": ["Horizon"],
+      "credits": "",
+      "logoFile": "",
+      "screenshots": [],
+      "dependencies": []
+    }
+]

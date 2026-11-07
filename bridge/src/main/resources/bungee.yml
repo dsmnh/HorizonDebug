@@ -1,0 +1,4 @@
+name: HorizonDebug
+main: dev.dsmnh.horizon.debug.bridge.HorizonDebugBridge
+version: 0.1.0
+author: Horizon

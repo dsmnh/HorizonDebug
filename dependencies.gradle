@@ -1,0 +1,6 @@
+// Add your dependencies here
+// 调试模组只依赖 Minecraft/Forge 本体与可选模组的反射入口，不引入任何编译期依赖。
+
+dependencies {
+
+}
