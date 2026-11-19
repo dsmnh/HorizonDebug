@@ -255,7 +255,12 @@ public final class ClientScript {
             }
             return "ok: client-result " + r;
         }
-        if ("shot".equals(op)) return ClientActions.shot(mc, v == null ? null : String.valueOf(v));
+        if ("shot".equals(op)) {
+            // 允许 "shot":"名字" 与 "shot":{"name":"名字"} 两种写法
+            Map<String, Object> m = Json.asMap(v);
+            if (m != null) return ClientActions.shot(mc, Json.str(m, "name", null));
+            return ClientActions.shot(mc, v == null ? null : String.valueOf(v));
+        }
         if ("click".equals(op)) return ClientActions.clickButton(mc, num(v, 0).intValue());
         if ("clickat".equals(op)) {
             Map<String, Object> m = Json.asMap(v);
