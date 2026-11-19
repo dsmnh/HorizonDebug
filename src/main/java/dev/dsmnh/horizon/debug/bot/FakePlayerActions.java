@@ -33,6 +33,9 @@ public final class FakePlayerActions {
     /** 每个 tick 的水平位移量（格），接近原版步行速度 */
     private static final double WALK_PER_TICK = 0.21D;
 
+    /** bot cmd 带回的最大回显行数，避免一条命令刷爆响应 */
+    private static final int MAX_CMD_LINES = 40;
+
     /** 进行中的行走任务：名称（小写）到任务 */
     private static final Map<String, Walk> WALKS = new LinkedHashMap<String, Walk>();
 
@@ -335,8 +338,21 @@ public final class FakePlayerActions {
         if (line.startsWith("/")) line = line.substring(1);
         MinecraftServer server = MinecraftServer.getServer();
         if (server == null) return "not-ready: 服务器未就绪";
-        int r = server.getCommandManager().executeCommand(bot.player, line);
-        return "ok: " + bot.name + " 执行 /" + line + " -> 返回值 " + r;
+        // 命令回显只写进发送者的聊天栏，executeCommand 的返回值是命令自身的结果码，
+        // 所以要包一层捕获器，把输出行原样带回来
+        CaptureSender capture = new CaptureSender(bot.player);
+        int r = server.getCommandManager().executeCommand(capture, line);
+        StringBuilder out = new StringBuilder();
+        out.append("ok: ").append(bot.name).append(" 执行 /").append(line).append(" -> 返回值 ").append(r);
+        List<String> lines = capture.lines();
+        int shown = Math.min(lines.size(), MAX_CMD_LINES);
+        for (int i = 0; i < shown; i++) {
+            out.append('\n').append("  ").append(lines.get(i));
+        }
+        if (lines.size() > shown) {
+            out.append('\n').append("  … 其余 ").append(lines.size() - shown).append(" 行省略");
+        }
+        return out.toString();
     }
 
     // ------------------------------------------------------------ 工具

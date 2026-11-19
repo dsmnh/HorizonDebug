@@ -132,6 +132,8 @@ op 一览：
   `real` 与 `bots` 两组，便于脚本断言「真玩家进了服」或「假玩家都在线」。
 - 服务端假玩家：`bot.spawn`、`bot.despawn`、`bot.list`、`bot.spawnmany`（一次拉起
   `count` 个，参数 `prefix`/`count`/可选 `dim`/`x`/`y`/`z`）、`bot.say` 与全部 bot 动作。
+  `bot.cmd` 会把命令的回显一并带回（`result.detail` 是首行，`result.lines` 是其余各行），
+  所以能直接读到 `/gt chunks`、`/aemobile` 这类命令的输出，而不是只拿到一个返回码。
 - 客户端：`ping`、`state`、`scan`、`inv`、`keys`、`shot`、`screen`、`open`、`click`、
   `clickat`、`close`、`events`、`events-clear`、`key`、`press`、`release`、`hotbar`、`look`、
   `turn`、`dig`、`place`、`use`、`attack`、`chat`、`cmd`、`connect`、`script`、

@@ -353,7 +353,20 @@ public final class ApiServer {
             if (command == null) throw new ApiException("BAD_ARGS", "缺少 command");
             for (String part : command.split(" ")) argv.add(part);
         }
-        return fromResult(FakePlayerActions.handle(action, argv.toArray(new String[argv.size()])));
+        String result = FakePlayerActions.handle(action, argv.toArray(new String[argv.size()]));
+        if ("cmd".equals(action) && result.startsWith("ok")) return cmdResult(result);
+        return fromResult(result);
+    }
+
+    /** {@code bot cmd} 的回显是多行文本：首行作 detail，其余行拆成 lines 方便脚本逐行断言 */
+    private static Object cmdResult(String raw) {
+        String[] parts = raw.split("\n", -1);
+        List<Object> lines = new ArrayList<Object>();
+        for (int i = 1; i < parts.length; i++) {
+            String one = parts[i].trim();
+            if (!one.isEmpty()) lines.add(one);
+        }
+        return Json.obj("detail", parts[0].length() > 4 ? parts[0].substring(4) : "", "lines", lines);
     }
 
     private static void addNum(List<String> argv, Map<String, Object> args, String key) {
