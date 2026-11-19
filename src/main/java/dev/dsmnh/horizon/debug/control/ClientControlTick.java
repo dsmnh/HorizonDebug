@@ -20,6 +20,11 @@ public final class ClientControlTick {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc == null) return;
         if (!HorizonDebug.controlEnabled) return;
+        // 窗口不在前台时原版会弹游戏菜单并冻结输入；自动化期间一律关掉失焦暂停。
+        // options.txt 与 GameSettings.saveOptions() 都会把它改回 true，所以每 tick 校正一次。
+        if (mc.gameSettings != null && mc.gameSettings.pauseOnLostFocus) {
+            mc.gameSettings.pauseOnLostFocus = false;
+        }
         try {
             ClientApi.drain(mc);
         } catch (Throwable t) {
