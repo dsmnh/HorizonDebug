@@ -8,6 +8,7 @@
     python tools/debug_client.py readcli [n]        查看客户端 cmd-client.out 尾部
     python tools/debug_client.py status             查询代理端调试桥自检信息
     python tools/debug_client.py servers            列出代理子服（名称与端口）
+    python tools/debug_client.py players            列出代理侧在线玩家（所在子服 / Ping）
     python tools/debug_client.py probe [channel]    向插件消息信道发送探测负载
     python tools/debug_client.py bridge '<json>'    发送一行自定义 JSON 到调试桥
 
@@ -93,6 +94,8 @@ def main() -> None:
         bridge_request({"op": "status"})
     elif cmd == "servers":
         bridge_request({"op": "servers"})
+    elif cmd == "players":
+        bridge_request({"op": "players"})
     elif cmd == "probe":
         req = {"op": "probe"}
         if rest:

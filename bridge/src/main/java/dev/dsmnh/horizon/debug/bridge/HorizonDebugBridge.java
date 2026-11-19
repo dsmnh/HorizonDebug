@@ -37,9 +37,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * HorizonDebug 代理端调试桥（命令执行与探测逻辑移植自 AEMobileBridge）。
  *
  * <p>在代理上监听一个本地 TCP 端口，接收一行 JSON 请求、回一行 JSON 响应。
- * 支持四个诊断 op：{@code exec}（以玩家身份执行代理命令并捕获回显）、
+ * 支持五个诊断 op：{@code exec}（以玩家身份执行代理命令并捕获回显）、
  * {@code probe}（向插件消息信道发送探测负载，验证信道连通）、
- * {@code status}（插件自检）、{@code servers}（列出子服名与端口）。
+ * {@code status}（插件自检）、{@code servers}（列出子服名与端口）、
+ * {@code players}（列出代理侧在线玩家及其所在子服）。
  * 与业务桥（HorizonBridge / AEMobileBridge）相互独立，端口错开部署。
  */
 public final class HorizonDebugBridge extends Plugin {
@@ -215,6 +216,9 @@ public final class HorizonDebugBridge extends Plugin {
             if ("servers".equals(op)) {
                 return serversOut();
             }
+            if ("players".equals(op) || "list".equals(op)) {
+                return playersOut();
+            }
             if ("probe".equals(op)) {
                 return probeOut(req);
             }
@@ -265,6 +269,34 @@ public final class HorizonDebugBridge extends Plugin {
             list.add(one);
         }
         out.add("servers", list);
+        out.addProperty("online", getProxy().getOnlineCount());
+        return out;
+    }
+
+    /**
+     * 列出代理侧在线玩家（名称、所在子服、Ping、是否 Forge 客户端、UUID）。
+     *
+     * <p>与 mod 侧 {@code server.players} 分工：这里看的是「代理认不认识这个人」，
+     * 那边看的是「子服里有没有这个实体」。两边都对不上时，问题在代理到子服的转发。
+     */
+    private JsonObject playersOut() {
+        JsonObject out = new JsonObject();
+        out.addProperty("ok", true);
+        JsonArray list = new JsonArray();
+        for (ProxiedPlayer p : getProxy().getPlayers()) {
+            JsonObject one = new JsonObject();
+            one.addProperty("name", p.getName());
+            one.addProperty("displayName", p.getDisplayName());
+            net.md_5.bungee.api.connection.Server server = p.getServer();
+            one.addProperty("server", server == null ? "" : server.getInfo().getName());
+            one.addProperty("port", server == null ? 0 : server.getInfo().getAddress().getPort());
+            one.addProperty("ping", p.getPing());
+            one.addProperty("forge", p.isForgeUser());
+            one.add("mods", new JsonPrimitive(p.isForgeUser() ? p.getModList().size() : 0));
+            one.addProperty("uuid", p.getUniqueId() == null ? "" : p.getUniqueId().toString());
+            list.add(one);
+        }
+        out.add("players", list);
         out.addProperty("online", getProxy().getOnlineCount());
         return out;
     }

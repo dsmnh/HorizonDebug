@@ -211,6 +211,7 @@ cd bridge; ./build.ps1        # 产物 HorizonDebugBridge.jar，复制到代理 
 {"op":"probe","secret":"…","channel":"SU|TabHF","player":"Steve"}
 {"op":"status","secret":"…"}
 {"op":"servers","secret":"…"}
+{"op":"players","secret":"…"}
 ```
 
 - `exec`：以玩家身份执行代理命令并捕获回显（不发公屏）。在线玩家权限委托真实连接；
@@ -222,6 +223,9 @@ cd bridge; ./build.ps1        # 产物 HorizonDebugBridge.jar，复制到代理 
   可覆盖默认值。
 - `status`：插件自检（配置、运行时长、请求/限流/错误计数）。
 - `servers`：代理子服清单（名称与端口），排查「按端口反查子服」一类问题。
+- `players`（别名 `list`）：代理侧在线玩家，含所在子服与端口、Ping、是否 Forge 客户端
+  与 mod 数量、UUID。与 mod 侧 `server.players` 分工：这里看「代理认不认识这个人」，
+  那里看「子服里有没有这个实体」；两边对不上时问题在代理到子服的转发。
 
 错误码：`BAD_SECRET` / `BAD_PLAYER` / `BAD_COMMAND` / `COMMAND_NOT_ALLOWED:<root>` /
 `PLAYER_NOT_ONLINE` / `UNKNOWN_OP` / `RATE_LIMITED` / `EXCEPTION:<描述>`。
