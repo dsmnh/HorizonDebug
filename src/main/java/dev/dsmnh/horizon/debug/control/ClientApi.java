@@ -223,6 +223,8 @@ public final class ClientApi {
         if ("shot".equals(lower) || "screenshot".equals(lower)) {
             return detail(ClientActions.shot(mc, Json.str(args, "name", null)));
         }
+        if ("inv".equals(lower) || "inventory".equals(lower)) return detail(ClientActions.inventory(mc));
+        if ("keys".equals(lower)) return detail(ClientActions.keys(mc));
         if ("screen".equals(lower)) return detail(ClientActions.screen(mc));
         if ("names".equals(lower)) return detail(ClientActions.dumpNames());
         if ("open".equals(lower) || "open-screen".equals(lower)) {

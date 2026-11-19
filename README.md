@@ -127,10 +127,16 @@ Horizon 生态的调试功能独立仓库：把 AEMobile 客户端、服务端�
 
 op 一览：
 
-- 服务端：`ping`、`server.status`、`bot.spawn|despawn|list|say` 与全部 bot 动作。
-- 客户端：`ping`、`state`、`scan`、`shot`、`screen`、`open`、`click`、`clickat`、`close`、
-  `events`、`events-clear`、`key`、`press`、`release`、`hotbar`、`look`、`turn`、`dig`、
-  `place`、`use`、`attack`、`chat`、`cmd`、`connect`、`script`、`script-stop`、`script-status`。
+- 服务端观测：`ping`、`server.status`、`server.tps`、`server.dims`、`server.players`。
+  `server.tps` 返回总览与逐世界 MSPT/TPS/实体/区块；`server.players` 把在线者分成
+  `real` 与 `bots` 两组，便于脚本断言「真玩家进了服」或「假玩家都在线」。
+- 服务端假玩家：`bot.spawn`、`bot.despawn`、`bot.list`、`bot.spawnmany`（一次拉起
+  `count` 个，参数 `prefix`/`count`/可选 `dim`/`x`/`y`/`z`）、`bot.say` 与全部 bot 动作。
+- 客户端：`ping`、`state`、`scan`、`inv`、`keys`、`shot`、`screen`、`open`、`click`、
+  `clickat`、`close`、`events`、`events-clear`、`key`、`press`、`release`、`hotbar`、`look`、
+  `turn`、`dig`、`place`、`use`、`attack`、`chat`、`cmd`、`connect`、`script`、
+  `script-stop`、`script-status`。`inv` 读背包，`keys` 打出当前键位绑定的键码，
+  用它能查出本机整合包把「前进」改到了哪个键。
 
 动作脚本为时间轴数组，每步只允许一个动作键（`at` 除外），`at` 为相对毫秒：
 

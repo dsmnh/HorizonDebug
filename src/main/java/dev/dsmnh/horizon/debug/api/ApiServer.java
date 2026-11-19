@@ -3,6 +3,8 @@ package dev.dsmnh.horizon.debug.api;
 import dev.dsmnh.horizon.debug.HorizonDebug;
 import dev.dsmnh.horizon.debug.bot.FakePlayerActions;
 import dev.dsmnh.horizon.debug.bot.FakePlayerFactory;
+import dev.dsmnh.horizon.debug.metrics.TickStats;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 
 import java.io.BufferedReader;
@@ -156,10 +158,96 @@ public final class ApiServer {
                     "max", Integer.valueOf(HorizonDebug.botMax),
                     "botEnabled", Boolean.valueOf(HorizonDebug.botEnabled));
         }
+        if ("server.tps".equals(op) || "tps".equals(op)) {
+            return tpsResult();
+        }
+        if ("server.dims".equals(op) || "dims".equals(op)) {
+            return dimsResult();
+        }
+        if ("server.players".equals(op) || "players".equals(op) || "list".equals(op)) {
+            return playersResult(server);
+        }
         if (op.startsWith("bot.")) {
             return botOp(server, op.substring(4), args);
         }
         throw new ApiException("UNKNOWN_OP", "未知 op：" + op);
+    }
+
+    // ------------------------------------------------------------ 观测类 op
+
+    /** 与服务端 {@code /horizondebug tps} 同一份数据：最近 5 秒窗口的总体与分维度 TPS */
+    private static Object tpsResult() {
+        TickStats.Snapshot snap = TickStats.get().snapshot();
+        List<Object> worlds = new ArrayList<Object>();
+        for (TickStats.WorldSnap w : snap.worlds) {
+            worlds.add(Json.obj(
+                    "dim", Integer.valueOf(w.dim),
+                    "name", w.name,
+                    "rawName", w.rawName,
+                    "provider", w.provider,
+                    "personal", Boolean.valueOf(w.personal),
+                    "loaded", Boolean.valueOf(w.loaded),
+                    "players", Integer.valueOf(w.players),
+                    "entities", Integer.valueOf(w.entities),
+                    "chunks", Integer.valueOf(w.chunks),
+                    "tps", Double.valueOf(w.tps),
+                    "mspt", Double.valueOf(w.mspt),
+                    "max", Double.valueOf(w.max),
+                    "ticks", Integer.valueOf(w.ticks)));
+        }
+        return Json.obj(
+                "at", Long.valueOf(snap.at),
+                "tps", Double.valueOf(snap.srvTps),
+                "mspt", Double.valueOf(snap.srvMspt),
+                "max", Double.valueOf(snap.srvMax),
+                "ticks", Integer.valueOf(snap.srvTicks),
+                "players", Integer.valueOf(snap.players),
+                "worlds", worlds);
+    }
+
+    /** 维度清单（显示名、provider、是否家园维度、是否已加载） */
+    private static Object dimsResult() {
+        TickStats.Snapshot snap = TickStats.get().snapshot();
+        List<Object> worlds = new ArrayList<Object>();
+        for (TickStats.WorldSnap w : snap.worlds) {
+            worlds.add(Json.obj(
+                    "dim", Integer.valueOf(w.dim),
+                    "name", w.name,
+                    "rawName", w.rawName,
+                    "provider", w.provider,
+                    "personal", Boolean.valueOf(w.personal),
+                    "loaded", Boolean.valueOf(w.loaded)));
+        }
+        return Json.obj("at", Long.valueOf(snap.at), "count", Integer.valueOf(worlds.size()), "worlds", worlds);
+    }
+
+    /** 在线玩家：真实玩家与假玩家分开列，便于核对注入结果 */
+    @SuppressWarnings("unchecked")
+    private static Object playersResult(MinecraftServer server) {
+        List<Object> real = new ArrayList<Object>();
+        List<Object> bots = new ArrayList<Object>();
+        List<EntityPlayerMP> all = server.getConfigurationManager().playerEntityList;
+        for (EntityPlayerMP p : all) {
+            boolean bot = FakePlayerFactory.exists(p.getCommandSenderName());
+            Map<String, Object> one = Json.obj(
+                    "name", p.getCommandSenderName(),
+                    "dim", Integer.valueOf(p.dimension),
+                    "x", Double.valueOf(round(p.posX)),
+                    "y", Double.valueOf(round(p.posY)),
+                    "z", Double.valueOf(round(p.posZ)),
+                    "hp", Double.valueOf(round(p.getHealth())),
+                    "ping", Integer.valueOf(p.ping));
+            (bot ? bots : real).add(one);
+        }
+        return Json.obj(
+                "total", Integer.valueOf(all.size()),
+                "real", real,
+                "bots", bots,
+                "botEnabled", Boolean.valueOf(HorizonDebug.botEnabled));
+    }
+
+    private static double round(double v) {
+        return Math.round(v * 10.0D) / 10.0D;
     }
 
     private static Object botOp(MinecraftServer server, String action, Map<String, Object> args) {
@@ -169,6 +257,25 @@ public final class ApiServer {
             List<Object> items = new ArrayList<Object>();
             for (String line : FakePlayerFactory.list()) items.add(line);
             return Json.obj("count", Integer.valueOf(FakePlayerFactory.count()), "items", items);
+        }
+        // spawnmany 同样不需要 name：一次拉起 N 个 Bot_<prefix><i>
+        if ("spawnmany".equals(action) || "spawn-all".equals(action)) {
+            String base = Json.str(args, "prefix", "bot");
+            Integer c = Json.integer(args, "count");
+            int count = c == null ? 5 : c.intValue();
+            if (count <= 0) throw new ApiException("BAD_ARGS", "count 必须大于 0");
+            if (FakePlayerFactory.count() + count > HorizonDebug.botMax) {
+                throw new ApiException("LIMIT", "已在线 " + FakePlayerFactory.count() + "，上限 " + HorizonDebug.botMax);
+            }
+            List<Object> spawned = new ArrayList<Object>();
+            for (int i = 1; i <= count; i++) {
+                String one = withPrefix(base + i);
+                String r = FakePlayerFactory.spawn(server, one,
+                        Json.integer(args, "dim"), Json.num(args, "x"), Json.num(args, "y"), Json.num(args, "z"));
+                spawned.add(Json.obj("name", one, "ok", Boolean.valueOf(r.startsWith("ok")),
+                        "detail", r.length() > 4 ? r.substring(4) : r));
+            }
+            return Json.obj("count", Integer.valueOf(spawned.size()), "items", spawned);
         }
         String name = Json.str(args, "name", null);
         if (name == null || name.isEmpty()) throw new ApiException("BAD_ARGS", "缺少 name");

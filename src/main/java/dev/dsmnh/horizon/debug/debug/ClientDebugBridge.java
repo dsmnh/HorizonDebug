@@ -112,6 +112,10 @@ public final class ClientDebugBridge {
             case "gui":
             case "screen":
                 return controlGuard(mc, ClientActions.screen(mc));
+            case "inventory":
+                return controlGuard(mc, ClientActions.inventory(mc));
+            case "keys":
+                return controlGuard(mc, ClientActions.keys(mc));
             case "click":
                 return controlGuard(mc, ClientActions.clickButton(mc, intOf(arg, -1)));
             case "clickat":

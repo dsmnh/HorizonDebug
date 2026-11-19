@@ -305,6 +305,37 @@ public final class ClientActions {
         }
     }
 
+    /** 读取背包：快捷栏、主背包、盔甲三块，空槽跳过 */
+    public static String inventory(Minecraft mc) {
+        if (mc == null || mc.thePlayer == null) return "not-in-game";
+        EntityPlayer p = mc.thePlayer;
+        StringBuilder sb = new StringBuilder();
+        sb.append("hotbar=").append(p.inventory.currentItem).append(" size=").append(p.inventory.getSizeInventory());
+        for (int i = 0; i < p.inventory.mainInventory.length; i++) {
+            ItemStack s = p.inventory.mainInventory[i];
+            if (s == null) continue;
+            sb.append("\n  [").append(i).append(i < 9 ? " 快捷栏" : " 背包").append("] ").append(describe(s));
+        }
+        for (int i = 0; i < p.inventory.armorInventory.length; i++) {
+            ItemStack s = p.inventory.armorInventory[i];
+            if (s == null) continue;
+            sb.append("\n  [armor ").append(i).append("] ").append(describe(s));
+        }
+        return "ok: " + sb;
+    }
+
+    /** 列出当前绑定的按键名与键码，脚本据此挑选可用键 */
+    public static String keys(Minecraft mc) {
+        if (mc == null || mc.gameSettings == null) return "not-in-game";
+        StringBuilder sb = new StringBuilder();
+        for (java.util.Map.Entry<String, net.minecraft.client.settings.KeyBinding> e
+                : ClientInput.binds(mc.gameSettings).entrySet()) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(e.getKey()).append('=').append(e.getValue() == null ? "?" : e.getValue().getKeyCode());
+        }
+        return "ok: " + sb;
+    }
+
     /** 主动打开一个原版界面：inventory / chat / pause */
     public static String openScreen(Minecraft mc, String name) {
         if (mc == null || mc.thePlayer == null) return "not-in-game";
