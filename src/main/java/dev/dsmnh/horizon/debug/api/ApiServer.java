@@ -172,6 +172,12 @@ public final class ApiServer {
         }
         String name = Json.str(args, "name", null);
         if (name == null || name.isEmpty()) throw new ApiException("BAD_ARGS", "缺少 name");
+        // despawn all 用原始值判断：加前缀后 "all" 会被改写成 "Bot_all"
+        if ("despawn".equals(action) && "all".equalsIgnoreCase(name)) {
+            List<String> names = FakePlayerFactory.names();
+            for (String one : names) FakePlayerFactory.despawn(server, one);
+            return Json.obj("despawned", Integer.valueOf(names.size()));
+        }
         name = withPrefix(name);
 
         if ("spawn".equals(action)) {
@@ -183,11 +189,6 @@ public final class ApiServer {
             return fromResult(r);
         }
         if ("despawn".equals(action)) {
-            if ("all".equalsIgnoreCase(name)) {
-                List<String> names = FakePlayerFactory.names();
-                for (String one : names) FakePlayerFactory.despawn(server, one);
-                return Json.obj("despawned", Integer.valueOf(names.size()));
-            }
             return fromResult(FakePlayerFactory.despawn(server, name));
         }
         if ("list".equals(action)) {
