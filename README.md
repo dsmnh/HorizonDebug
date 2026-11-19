@@ -169,6 +169,27 @@ python tools/hdebug.py srv-tail 20     # 或 cli-tail / srv-raw / cli-raw
 `key=value` 的 value 先按 JSON 解析（`true` / `10` / 对象），失败再当字符串；
 `HORIZON_DEBUG_TIMEOUT` 控制等待秒数（默认 15）。
 
+## tools/hscenario.py
+
+把一串请求写成场景文件一次跑完，按断言判定成败（退出码 0 表示全通过）：
+
+```bash
+python tools/hscenario.py tools/scenarios/bot-basic.json      # 假玩家基础动作
+python tools/hscenario.py tools/scenarios/client-basic.json   # 客户端操控基础
+python tools/hscenario.py tools/scenarios/cross-e2e.json      # 假玩家与真客户端并存
+```
+
+每步只做一件事：`srv` / `cli`（op + args）或 `sleep`（毫秒）。`expect` 是断言列表，
+每项含点号路径 `path` 与 `eq` / `contains` / `exists` 之一：
+
+```json
+{"srv":"bot.state","args":{"name":"Bot_sc1"},
+ "expect":[{"path":"result.detail","contains":"sneaking=true"}]}
+```
+
+`--json` 输出完整报告（含每条响应），便于脚本二次处理。仓储内三个场景覆盖假玩家
+基本动作、客户端观测与截图、以及两侧并存的端到端链路。
+
 ## mod：构建
 
 ```bash

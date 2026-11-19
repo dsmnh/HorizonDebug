@@ -1,0 +1,115 @@
+{
+  "name": "端到端：假玩家与真客户端并存",
+  "timeout": 20,
+  "steps": [
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    },
+    {
+      "srv": "bot.spawnmany",
+      "args": {
+        "prefix": "e2e",
+        "count": 3,
+        "dim": 0
+      },
+      "expect": [
+        {
+          "path": "result.count",
+          "eq": 3
+        }
+      ]
+    },
+    {
+      "sleep": 1500
+    },
+    {
+      "srv": "server.players",
+      "expect": [
+        {
+          "path": "result.bots",
+          "contains": "Bot_e2e1"
+        },
+        {
+          "path": "result.botEnabled",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "cli": "ping",
+      "expect": [
+        {
+          "path": "result.pong",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "cli": "state",
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "cli": "chat",
+      "args": {
+        "text": "e2e-scenario"
+      },
+      "expect": [
+        {
+          "path": "result.sent",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "sleep": 1500
+    },
+    {
+      "srv": "server.players",
+      "note": "真玩家在线时 real 组非空"
+    },
+    {
+      "cli": "shot",
+      "args": {
+        "name": "e2e-scenario"
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "sleep": 800
+    },
+    {
+      "srv": "server.players",
+      "expect": [
+        {
+          "path": "result.bots",
+          "contains": "[]"
+        }
+      ]
+    }
+  ]
+}

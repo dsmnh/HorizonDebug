@@ -1,0 +1,158 @@
+{
+  "name": "假玩家基础动作",
+  "timeout": 20,
+  "steps": [
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      },
+      "note": "清场"
+    },
+    {
+      "srv": "bot.spawn",
+      "args": {
+        "name": "sc1",
+        "dim": 0
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ],
+      "note": "拉起 Bot_sc1"
+    },
+    {
+      "sleep": 1200
+    },
+    {
+      "srv": "bot.state",
+      "args": {
+        "name": "Bot_sc1"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "hp="
+        }
+      ]
+    },
+    {
+      "srv": "bot.look",
+      "args": {
+        "name": "Bot_sc1",
+        "yaw": 90,
+        "pitch": 10
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "srv": "bot.sneak",
+      "args": {
+        "name": "Bot_sc1",
+        "on": true
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "srv": "bot.move",
+      "args": {
+        "name": "Bot_sc1",
+        "forward": 1,
+        "ticks": 20
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "sleep": 1600
+    },
+    {
+      "srv": "bot.state",
+      "args": {
+        "name": "Bot_sc1"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "sneaking=true"
+        }
+      ]
+    },
+    {
+      "srv": "bot.give",
+      "args": {
+        "name": "Bot_sc1",
+        "item": "minecraft:stone",
+        "count": 8
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "srv": "bot.inv",
+      "args": {
+        "name": "Bot_sc1"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "stone"
+        }
+      ]
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_sc1",
+        "command": "horizondebug bot list"
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "srv": "server.players",
+      "expect": [
+        {
+          "path": "result.botEnabled",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    }
+  ]
+}

@@ -81,7 +81,8 @@ def wait_response(out_path: Path, req_id: str, skip_lines: int, timeout: float):
     return None
 
 
-def send(side: str, op: str, args: dict, timeout: float) -> int:
+def request(side: str, op: str, args: dict, timeout: float):
+    """发一条请求并返回响应字典；超时返回 None（供 scenarios 一类上层脚本复用）"""
     in_path, out_path, label = paths(side)
     in_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -95,9 +96,14 @@ def send(side: str, op: str, args: dict, timeout: float) -> int:
     # 追加一行请求：模组按「最后一个换行」切行，未写完的尾部会等下次拼接
     with open(in_path, "a", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(req, ensure_ascii=False) + "\n")
-    resp = wait_response(out_path, req_id, skip, timeout)
+    return wait_response(out_path, req_id, skip, timeout)
+
+
+def send(side: str, op: str, args: dict, timeout: float) -> int:
+    resp = request(side, op, args, timeout)
     if resp is None:
-        print(f"timeout: {timeout:.0f}s 内没有收到 {req_id} 的响应（{out_path}）", file=sys.stderr)
+        _, out_path, _ = paths(side)
+        print(f"timeout: {timeout:.0f}s 内没有收到响应（{out_path}）", file=sys.stderr)
         return 2
     print(json.dumps(resp, ensure_ascii=False, indent=2))
     return 0 if resp.get("ok") else 1

@@ -1,0 +1,88 @@
+{
+  "name": "客户端操控基础",
+  "timeout": 20,
+  "steps": [
+    {
+      "cli": "ping",
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "cli": "state",
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "name="
+        }
+      ]
+    },
+    {
+      "cli": "keys",
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "forward="
+        }
+      ]
+    },
+    {
+      "cli": "inv",
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "cli": "look",
+      "args": {
+        "yaw": 90,
+        "pitch": 5
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "cli": "scan",
+      "args": {
+        "radius": 4
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "cli": "events",
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    },
+    {
+      "cli": "shot",
+      "args": {
+        "name": "scenario-check"
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ]
+    }
+  ]
+}

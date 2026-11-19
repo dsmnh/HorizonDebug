@@ -32,6 +32,7 @@ whitelist.json
 !gradlew.bat
 bridge/*.jar
 *.DS_Store
+__pycache__/
 
 # 仓库内不得出现机器路径与密钥；本地构建脚本与凭据不入库
 bridge/local/
