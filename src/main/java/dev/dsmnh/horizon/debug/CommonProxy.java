@@ -2,6 +2,9 @@ package dev.dsmnh.horizon.debug;
 
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.event.*;
+import dev.dsmnh.horizon.debug.api.ApiServer;
+import dev.dsmnh.horizon.debug.bot.FakePlayerFactory;
+import dev.dsmnh.horizon.debug.bot.FakePlayerTick;
 import dev.dsmnh.horizon.debug.command.CommandHorizonDebug;
 import dev.dsmnh.horizon.debug.debug.DebugBridge;
 import dev.dsmnh.horizon.debug.metrics.TickStats;
@@ -40,13 +43,20 @@ public class CommonProxy {
             FMLCommonHandler.instance().bus().register(TickStats.get());
             // debug 命令桥（默认关闭）：命令必须回主线程执行，只能在 tick 里排空队列
             FMLCommonHandler.instance().bus().register(new DebugBridge.ServerTickHandler());
+            // 假玩家 tick：只在配置开启时注册，负责排空虚构连接的出站包队列
+            if (HorizonDebug.botEnabled) {
+                FMLCommonHandler.instance().bus().register(new FakePlayerTick());
+            }
             eventsRegistered = true;
         }
         DebugBridge.startServer();
+        ApiServer.start(DebugBridge.serverDir());
     }
 
     public void serverStopping(FMLServerStoppingEvent event) {
+        ApiServer.stop();
         DebugBridge.stop();
+        FakePlayerFactory.reset();
         TickStats.get().reset();
     }
 

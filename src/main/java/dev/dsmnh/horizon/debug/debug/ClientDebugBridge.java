@@ -2,6 +2,11 @@ package dev.dsmnh.horizon.debug.debug;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
+import dev.dsmnh.horizon.debug.HorizonDebug;
+import dev.dsmnh.horizon.debug.control.ClientActions;
+import dev.dsmnh.horizon.debug.control.ClientEvents;
+import dev.dsmnh.horizon.debug.control.ClientInput;
+import dev.dsmnh.horizon.debug.control.ClientScript;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
@@ -80,6 +85,50 @@ public final class ClientDebugBridge {
                 return biome(mc);
             case "nei":
                 return neiShare(mc);
+            case "key":
+            case "press":
+                return controlGuard(mc, ClientInput.press(mc, arg.split(" +")[0], true));
+            case "release":
+                return controlGuard(mc, ClientInput.press(mc, arg.split(" +")[0], false));
+            case "hotbar":
+                return controlGuard(mc, ClientInput.hotbar(mc, intOf(arg, 0)));
+            case "look":
+                return controlGuard(mc, look(mc, arg));
+            case "turn":
+                return controlGuard(mc, turn(mc, arg));
+            case "lookat":
+                return controlGuard(mc, lookAt(mc, arg));
+            case "dig":
+                return controlGuard(mc, dig(mc, arg));
+            case "place":
+                return controlGuard(mc, place(mc, arg));
+            case "use":
+                return controlGuard(mc, ClientActions.use(mc));
+            case "attack":
+                return controlGuard(mc, ClientActions.attack(mc, arg));
+            case "shot":
+            case "screenshot":
+                return controlGuard(mc, ClientActions.shot(mc, arg));
+            case "gui":
+            case "screen":
+                return controlGuard(mc, ClientActions.screen(mc));
+            case "click":
+                return controlGuard(mc, ClientActions.clickButton(mc, intOf(arg, -1)));
+            case "clickat":
+                return controlGuard(mc, clickAt(mc, arg));
+            case "open":
+            case "openscreen":
+                return controlGuard(mc, ClientActions.openScreen(mc, arg));
+            case "close":
+                return controlGuard(mc, ClientActions.closeScreen(mc));
+            case "events":
+                return controlGuard(mc, events(arg));
+            case "script":
+                return controlGuard(mc, script(mc, arg));
+            case "script-stop":
+                return controlGuard(mc, ClientScript.stop(mc));
+            case "script-status":
+                return controlGuard(mc, scriptStatus());
             default:
                 // 不带子命令时保持原行为：整行当命令处理
                 return command(mc, line);
@@ -107,7 +156,11 @@ public final class ClientDebugBridge {
             }
         }
         try {
-            cpw.mods.fml.client.FMLClientHandler.instance().connectToServer(
+            cpw.mods.fml.client.FMLClientHandler handler = cpw.mods.fml.client.FMLClientHandler.instance();
+            // connectToServer 会读取私有 Map serverDataTag，该字段只由 setupServerList 初始化；
+            // 从主菜单自动化连服时它仍是 null，直接调用必 NPE，故先补一次初始化。
+            handler.setupServerList();
+            handler.connectToServer(
                 mc.currentScreen,
                 new net.minecraft.client.multiplayer.ServerData("horizondebug-test", host + ":" + port));
             return "connecting " + host + ":" + port;
@@ -239,6 +292,119 @@ public final class ClientDebugBridge {
             sb.append(json ? e.json : e.text);
         }
         return sb.toString();
+    }
+
+    // ------------------------------------------------------------ 操控（[control] enabled 才放行）
+
+    /** 操控类子命令的统一闸门：未开启 {@code [control] enabled} 时一律拒绝 */
+    private static String controlGuard(Minecraft mc, String result) {
+        if (!HorizonDebug.controlEnabled) return "disabled: config [control] enabled=false";
+        return result;
+    }
+
+    private static String look(Minecraft mc, String arg) {
+        String[] a = arg.trim().split(" +");
+        if (a.length < 2) return "usage: look <yaw> <pitch>";
+        try {
+            return ClientInput.look(mc, Float.parseFloat(a[0]), Float.parseFloat(a[1]));
+        } catch (NumberFormatException e) {
+            return "bad-args: look 需要两个数字";
+        }
+    }
+
+    private static String turn(Minecraft mc, String arg) {
+        String[] a = arg.trim().split(" +");
+        if (a.length < 2) return "usage: turn <dyaw> <dpitch>";
+        try {
+            return ClientInput.turn(mc, Float.parseFloat(a[0]), Float.parseFloat(a[1]));
+        } catch (NumberFormatException e) {
+            return "bad-args: turn 需要两个数字";
+        }
+    }
+
+    private static String lookAt(Minecraft mc, String arg) {
+        String[] a = arg.trim().split(" +");
+        if (a.length < 3) return "usage: lookat <x> <y> <z>";
+        try {
+            return ClientInput.lookAt(mc, Double.parseDouble(a[0]), Double.parseDouble(a[1]),
+                    Double.parseDouble(a[2]));
+        } catch (NumberFormatException e) {
+            return "bad-args: lookat 需要三个数字";
+        }
+    }
+
+    private static String dig(Minecraft mc, String arg) {
+        String[] a = arg.trim().split(" +");
+        if (arg.trim().isEmpty()) return ClientActions.dig(mc, null, null, null);
+        if (a.length < 3) return "usage: dig <x> <y> <z>";
+        try {
+            return ClientActions.dig(mc, Integer.valueOf(Integer.parseInt(a[0])),
+                    Integer.valueOf(Integer.parseInt(a[1])), Integer.valueOf(Integer.parseInt(a[2])));
+        } catch (NumberFormatException e) {
+            return "bad-args: dig 需要三个整数坐标";
+        }
+    }
+
+    private static String place(Minecraft mc, String arg) {
+        String[] a = arg.trim().split(" +");
+        if (arg.trim().isEmpty()) return ClientActions.place(mc, null, null, null, null);
+        if (a.length < 3) return "usage: place <x> <y> <z> [face]";
+        try {
+            Integer face = a.length > 3 ? Integer.valueOf(Integer.parseInt(a[3])) : null;
+            return ClientActions.place(mc, Integer.valueOf(Integer.parseInt(a[0])),
+                    Integer.valueOf(Integer.parseInt(a[1])), Integer.valueOf(Integer.parseInt(a[2])), face);
+        } catch (NumberFormatException e) {
+            return "bad-args: place 需要三个整数坐标";
+        }
+    }
+
+    private static String clickAt(Minecraft mc, String arg) {
+        String[] a = arg.trim().split(" +");
+        if (a.length < 2) return "usage: clickat <x> <y> [button]";
+        try {
+            int button = a.length > 2 ? Integer.parseInt(a[2]) : 0;
+            return ClientActions.clickAt(mc, Integer.parseInt(a[0]), Integer.parseInt(a[1]), button);
+        } catch (NumberFormatException e) {
+            return "bad-args: clickat 需要屏幕坐标";
+        }
+    }
+
+    private static String events(String arg) {
+        int n = intOf(arg, 20);
+        List<String> list = ClientEvents.recent(n);
+        if (list.isEmpty()) return "ok: 没有事件";
+        StringBuilder sb = new StringBuilder("ok:");
+        for (String s : list) sb.append('\n').append(s);
+        return sb.toString();
+    }
+
+    /**
+     * 动作脚本：{@code script [{"at":0,"key":{"name":"forward","down":true}}, ...]}。
+     *
+     * <p>文本通道里为避免行内空格切分，整个步骤数组必须写在一行内，即标准 JSON 数组。
+     */
+    private static String script(Minecraft mc, String arg) {
+        if (arg.trim().isEmpty()) return "usage: script [{\"at\":0,\"press\":\"forward\"}, ...]";
+        Object parsed = dev.dsmnh.horizon.debug.api.Json.tryParse(arg.trim());
+        if (!(parsed instanceof List)) return "bad-args: script 需要一个 JSON 数组";
+        @SuppressWarnings("unchecked")
+        List<Object> steps = (List<Object>) parsed;
+        return ClientScript.start(mc, steps);
+    }
+
+    private static String scriptStatus() {
+        StringBuilder sb = new StringBuilder(ClientScript.status());
+        List<String> log = ClientScript.recent(5);
+        for (String s : log) sb.append("\n  ").append(s);
+        return sb.toString();
+    }
+
+    private static int intOf(String arg, int def) {
+        try {
+            return Integer.parseInt(arg.trim().split(" +")[0]);
+        } catch (Throwable t) {
+            return def;
+        }
     }
 
     // ------------------------------------------------------------ 工具

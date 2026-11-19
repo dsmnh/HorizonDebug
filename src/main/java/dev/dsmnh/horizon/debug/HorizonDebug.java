@@ -28,6 +28,44 @@ public class HorizonDebug {
      */
     public static String[] tpsNames = new String[0];
 
+    /** 假玩家开关（config 的 {@code [bot] enabled}）。开启后 {@code /horizondebug bot} 系列子命令可用。 */
+    public static boolean botEnabled;
+
+    /** 假玩家同时在线上限（config 的 {@code [bot] max}）。 */
+    public static int botMax = 10;
+
+    /** 假玩家名称前缀（config 的 {@code [bot] prefix}），用于识别与批量清理。 */
+    public static String botPrefix = "Bot_";
+
+    /** 假玩家是否免伤（config 的 {@code [bot] invulnerable}），避免饿死摔死污染测试数据。 */
+    public static boolean botInvulnerable = true;
+
+    /**
+     * JSONL 调试 API 开关（config 的 {@code [debug] jsonApi}）。开启后监听
+     * {@code dumps/horizondebug/api.jsonl}，把每行请求转成 {@code api-out.jsonl} 的响应；
+     * 依赖 {@code [debug] enabled}，两者都开才生效。
+     */
+    public static boolean jsonApi = true;
+
+    /**
+     * 客户端操控总开关（config 的 {@code [control] enabled}）。开启后客户端会响应
+     * {@code cmd-client.txt} 的动作命令与 {@code dumps/horizondebug/api.jsonl} 的 {@code client.*} 请求，
+     * 等价于替真人按键、转视角、点界面、挖放方块。默认关闭。
+     */
+    public static boolean controlEnabled;
+
+    /** 是否允许调试通道操作界面（点按钮、按坐标点击）。关掉后 {@code gui} 系列只读不可点。 */
+    public static boolean controlAllowGui = true;
+
+    /** 是否允许调试通道挖掘/放置/攻击/使用物品。 */
+    public static boolean controlAllowClick = true;
+
+    /** 是否允许调试通道截图（会写文件到 dumps/horizondebug/shots）。 */
+    public static boolean controlAllowScreenshot = true;
+
+    /** 单个动作脚本允许的最大步数（config 的 {@code [control] script-max-steps}）。 */
+    public static int controlScriptMaxSteps = 200;
+
     @SidedProxy(clientSide = Tags.GROUPNAME + ".ClientProxy", serverSide = Tags.GROUPNAME + ".CommonProxy")
     public static CommonProxy proxy;
 
@@ -41,6 +79,28 @@ public class HorizonDebug {
         tpsNames = config.getStringList("names", "tps", new String[0],
                 "Override the display name of a world, one per line: DIM70=暮色森林 (or 70=暮色森林).\n"
                         + "Priority: Multiverse alias > this list > built-in table > provider name > world folder name.");
+        botEnabled = config.getBoolean("enabled", "bot", false,
+                "Enable in-process fake players (/horizondebug bot spawn). Keep it false on public servers.");
+        botMax = config.getInt("max", "bot", 10, 1, 200,
+                "Maximum number of fake players online at the same time.");
+        botPrefix = config.getString("prefix", "bot", "Bot_",
+                "Name prefix for fake players, used to recognise and clean them up.");
+        botInvulnerable = config.getBoolean("invulnerable", "bot", true,
+                "Keep fake players from starving or dying to fall damage during tests.");
+        jsonApi = config.getBoolean("jsonApi", "debug", true,
+                "Enable the JSONL debug API (dumps/horizondebug/api.jsonl -> api-out.jsonl)."
+                        + " Requires [debug] enabled=true.");
+        controlEnabled = config.getBoolean("enabled", "control", false,
+                "Enable client-side control over the file bridge and JSONL API (keys, look, GUI, dig/place)."
+                        + " Equivalent to letting a script play the game. Keep it false unless testing.");
+        controlAllowGui = config.getBoolean("allow-gui", "control", true,
+                "Allow the control channel to click GUI buttons and send synthetic clicks.");
+        controlAllowClick = config.getBoolean("allow-click", "control", true,
+                "Allow the control channel to dig, place, use items and attack.");
+        controlAllowScreenshot = config.getBoolean("allow-screenshot", "control", true,
+                "Allow the control channel to write screenshots under dumps/horizondebug/shots.");
+        controlScriptMaxSteps = config.getInt("script-max-steps", "control", 200, 1, 5000,
+                "Maximum number of steps in one action script.");
         config.save();
         proxy.preInit(event);
     }

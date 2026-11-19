@@ -8,15 +8,16 @@ Horizon 生态的调试功能独立仓库：把 AEMobile 客户端、服务端�
 
 | 产物 | 形态 | 内容 |
 |---|---|---|
-| `horizondebug` mod | Forge 1.7.10（服务端 + 客户端同一个 jar） | 文件命令桥（服务端 / 客户端两条通道）+ `/horizondebug` 诊断命令 + TPS/MSPT 采集 |
+| `horizondebug` mod | Forge 1.7.10（服务端 + 客户端同一个 jar） | 文件命令桥（服务端 / 客户端两条通道）+ `/horizondebug` 诊断命令 + TPS/MSPT 采集 + 假玩家 + 客户端操控 + JSONL 调试 API |
 | `HorizonDebugBridge` | BungeeCord/HexaCord 插件（Java 8） | JSON TCP 调试桥：`exec` / `probe` / `status` / `servers` 四个诊断 op |
 | `tools/debug_client.py` | Python 脚本 | 驱动文件命令桥与调试桥的命令行客户端 |
+| `tools/hdebug.py` | Python 脚本 | 驱动 JSONL 调试 API（假玩家与客户端操控）的命令行入口 |
 
 ```
 ├── build.gradle 等          Forge mod 的 Gradle 工程（GTNH ExampleMod1.7.10 模板）
 ├── src/main/java/...        mod 源码（dev.dsmnh.horizon.debug）
 ├── bridge/                  BC 插件源码（dev.dsmnh.horizon.debug.bridge）+ build.ps1
-└── tools/                   调试客户端脚本
+└── tools/                   调试客户端脚本（debug_client.py 文件桥；hdebug.py JSONL API）
 ```
 
 ## mod：文件命令桥
@@ -63,6 +64,104 @@ Horizon 生态的调试功能独立仓库：把 AEMobile 客户端、服务端�
 
 `config/HorizonDebug.cfg` 的 `[tps] names`（`DIM70=暮色森林` 或 `70=暮色森林`）。
 优先级：Multiverse alias > 该配置 > 内置维度表 > provider 英文名 > 世界文件夹名。
+
+## mod：假玩家（bot）
+
+在服务端进程内注入真实 `EntityPlayerMP`（不使用外部协议客户端），假玩家会出现在 `/list`
+与玩家列表、触发 `PlayerLoggedInEvent`，可聊天、执行命令、移动、被攻击。默认关闭。
+
+```ini
+[bot]
+    B:enabled=true       # 总开关
+    I:max=10             # 同时在线上限
+    S:prefix=Bot_        # 名称前缀，便于业务模组与真实玩家区分
+    B:invulnerable=true  # 免伤害与免饥饿
+```
+
+命令：`/horizondebug bot spawn <name> [dim] [x y z]`、`despawn <name>|all`、`list`、
+`say <name> <text>`，以及动作 `state` / `inv` / `hand` / `move` / `stop` / `tp` / `jump` /
+`sneak` / `sprint` / `look` / `dig` / `place` / `use` / `attack` / `give` / `cmd`。
+
+聊天走非主线程投递：Crucible（Cauldron 系）要求在异步线程触发 `AsyncPlayerChatEvent`，
+主线程直接调用会被拒绝并抛 `IllegalStateException`，故 `say` 交给独立守护线程执行，
+结果由服务端 tick 回写日志。
+
+## mod：客户端操控（client control）
+
+驱动**真实客户端**的输入层：直接置位 `KeyBinding`、覆盖 `movementInput` 做移动、
+写旋转字段并重算准星、调用 `PlayerControllerMP` 挖放用攻击、反射点 GUI 按钮、截图。
+默认关闭。
+
+```ini
+[control]
+    B:enabled=false          # 总开关
+    B:allow-gui=true         # 允许读/点 GUI
+    B:allow-click=true       # 允许挖/放/使用
+    B:allow-screenshot=true  # 允许截图
+    I:script-max-steps=200   # 单次脚本步数上限
+```
+
+- 1.7.10 运行期 `GuiScreen` 与 `Minecraft.debugFPS` 等成员是混淆名（`field_xxxxxx` /
+  `func_xxxxxx`），代码一律通过「候选名依次尝试」的反射助手读取，不绑定单一名字。
+- 截图走 `ScreenShotHelper.saveScreenshot`，产物固定在 `<dir>/screenshots/<name>`，
+  因此文件名由调用方补 `.png`，落到 `dumps/horizondebug/shots/screenshots/`。
+- 窗口失焦时关闭 `pauseOnLostFocus`，避免每次失焦弹暂停菜单打断脚本。
+
+## mod：JSONL 调试 API
+
+`[debug] enabled=true` 且 `jsonApi=true` 时启动。请求/响应为一行一条 JSON：
+
+| 文件 | 侧 |
+|---|---|
+| `api.jsonl` → `api-out.jsonl` | 服务端（假玩家） |
+| `api-client.jsonl` → `api-client-out.jsonl` | 客户端（操控） |
+
+```json
+{"id":"a1","side":"server","op":"bot.spawn","args":{"name":"Bot_01","dim":0}}
+{"id":"a2","side":"client","op":"look","args":{"yaw":90,"pitch":10}}
+```
+
+响应 `{"id","ok":true,"ms","result":{...}}` 或 `{"id","ok":false,"error":{"code","message"}}`。
+错误码：`BAD_JSON` / `UNKNOWN_OP` / `BAD_ARGS` / `NOT_IN_GAME` / `NOT_FOUND` / `LIMIT` /
+`BUSY` / `DISABLED` / `FAILED` / `INTERNAL`。两侧分文件，单机（客户端兼服务端）也不会抢行。
+
+op 一览：
+
+- 服务端：`ping`、`server.status`、`bot.spawn|despawn|list|say` 与全部 bot 动作。
+- 客户端：`ping`、`state`、`scan`、`shot`、`screen`、`open`、`click`、`clickat`、`close`、
+  `events`、`events-clear`、`key`、`press`、`release`、`hotbar`、`look`、`turn`、`dig`、
+  `place`、`use`、`attack`、`chat`、`cmd`、`connect`、`script`、`script-stop`、`script-status`。
+
+动作脚本为时间轴数组，每步只允许一个动作键（`at` 除外），`at` 为相对毫秒：
+
+```json
+{"op":"script","args":{"steps":[
+  {"at":0,    "key":{"name":"forward","down":true}},
+  {"at":900,  "key":{"name":"forward","down":false}},
+  {"at":1000, "look":{"yaw":90,"pitch":5}},
+  {"at":1200, "chat":"队伍测试"}
+]}}
+```
+
+## tools/hdebug.py
+
+JSONL 统一入口（`[debug] enabled` 开启即可用，无需 RCON）：
+
+```bash
+export HORIZON_DEBUG_SERVER=/path/to/server
+export HORIZON_DEBUG_CLIENT=/path/to/instance/.minecraft
+
+python tools/hdebug.py srv bot.spawn name=1
+python tools/hdebug.py srv bot.list
+python tools/hdebug.py srv bot.say name=Bot_1 text=hello
+python tools/hdebug.py cli state
+python tools/hdebug.py cli look yaw=90 pitch=10
+python tools/hdebug.py cli script 'steps=[{"at":0,"key":{"name":"forward","down":true}}]'
+python tools/hdebug.py srv-tail 20     # 或 cli-tail / srv-raw / cli-raw
+```
+
+`key=value` 的 value 先按 JSON 解析（`true` / `10` / 对象），失败再当字符串；
+`HORIZON_DEBUG_TIMEOUT` 控制等待秒数（默认 15）。
 
 ## mod：构建
 

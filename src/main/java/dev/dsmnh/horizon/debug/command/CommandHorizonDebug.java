@@ -1,5 +1,8 @@
 package dev.dsmnh.horizon.debug.command;
 
+import dev.dsmnh.horizon.debug.HorizonDebug;
+import dev.dsmnh.horizon.debug.bot.FakePlayerActions;
+import dev.dsmnh.horizon.debug.bot.FakePlayerFactory;
 import dev.dsmnh.horizon.debug.debug.DebugBridge;
 import dev.dsmnh.horizon.debug.metrics.TickStats;
 import dev.dsmnh.horizon.debug.metrics.WorldNames;
@@ -18,9 +21,12 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * 服务端诊断命令 {@code /horizondebug}（移植自 AEMobile 的 CommandAEMobileServer 诊断部分）：
@@ -31,7 +37,8 @@ import java.util.Locale;
  *       脚本无需解析聊天记录；</li>
  *   <li>{@code dims} —— 导出维度清单（dimid / 世界名 / provider 名 / 显示名），
  *       写入 {@code dumps/horizondebug/dims.txt}，补充世界中文表时使用；</li>
- *   <li>{@code say <text>} —— 从服务端广播一行聊天，验证「服务器聊天到达客户端 / App」。</li>
+ *   <li>{@code say <text>} —— 从服务端广播一行聊天，验证「服务器聊天到达客户端 / App」；</li>
+ *   <li>{@code bot <action> ...} —— 假玩家的登录、动作与状态查询，动作表见 {@link FakePlayerActions}。</li>
  * </ul>
  */
 public class CommandHorizonDebug extends CommandBase {
@@ -45,7 +52,15 @@ public class CommandHorizonDebug extends CommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/horizondebug tps | dims | say <text>";
+        return "/horizondebug tps | dims | say <text>"
+                + " | bot spawn <name> [dim] [x y z] | bot despawn <name>|all | bot list"
+                + " | bot say <name> <text> | bot state|inv|hand <name>"
+                + " | bot move <name> <forward> [strafe] [ticks] | bot stop <name>"
+                + " | bot tp <name> <x> <y> <z> [dim] | bot jump <name>"
+                + " | bot sneak|sprint <name> [on|off] | bot look <name> <yaw> <pitch>"
+                + " | bot dig <name> <x> <y> <z> [force] | bot place|use <name> <x> <y> <z> [face]"
+                + " | bot attack <name> <目标名|实体ID|nearest> | bot give <name> <物品> [数量] [meta]"
+                + " | bot cmd <name> <命令...>";
     }
 
     /** 对所有人可见；管理子命令在 {@link #processCommand} 里单独检查权限 2 */
@@ -79,7 +94,156 @@ public class CommandHorizonDebug extends CommandBase {
             broadcastTest(sender, args);
             return;
         }
+        if ("bot".equals(sub)) {
+            botCommand(sender, args);
+            return;
+        }
         sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + getCommandUsage(sender)));
+    }
+
+    // ------------------------------------------------------------ bot
+
+    /**
+     * 假玩家管理子命令。
+     *
+     * <p>名称未带 {@code [bot] prefix} 前缀时自动补上，避免假玩家混进真实玩家名册；
+     * 上限与开关都取自配置，未开启时给出明确提示而不是静默失败。
+     */
+    private void botCommand(ICommandSender sender, String[] args) {
+        if (!HorizonDebug.botEnabled) {
+            sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED
+                    + "[HorizonDebug] 假玩家未启用：请把 config/HorizonDebug.cfg 的 [bot] enabled 设为 true"));
+            return;
+        }
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null) {
+            sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "[HorizonDebug] 服务器尚未就绪"));
+            return;
+        }
+        String action = args.length < 2 ? "list" : args[1].toLowerCase(Locale.ROOT);
+        if ("list".equals(action)) {
+            List<String> names = FakePlayerFactory.list();
+            sender.addChatMessage(new ChatComponentText(EnumChatFormatting.GRAY
+                    + "[HorizonDebug] 在线假玩家 " + names.size() + " / " + HorizonDebug.botMax));
+            for (String line : names) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.GRAY + "  " + line));
+            }
+            return;
+        }
+        if ("spawn".equals(action)) {
+            if (args.length < 3) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED
+                        + "[HorizonDebug] 用法：/horizondebug bot spawn <name> [dim] [x y z]"));
+                return;
+            }
+            if (FakePlayerFactory.count() >= HorizonDebug.botMax) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED
+                        + "[HorizonDebug] 已达上限 " + HorizonDebug.botMax + "，先 despawn 再 spawn"));
+                return;
+            }
+            String name = botName(args[2]);
+            Integer dim = null;
+            Double x = null, y = null, z = null;
+            if (args.length >= 4) {
+                try {
+                    dim = Integer.valueOf(args[3]);
+                } catch (NumberFormatException e) {
+                    sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED
+                            + "[HorizonDebug] 维度必须是整数：" + args[3]));
+                    return;
+                }
+            }
+            if (args.length >= 7) {
+                try {
+                    x = Double.valueOf(args[4]);
+                    y = Double.valueOf(args[5]);
+                    z = Double.valueOf(args[6]);
+                } catch (NumberFormatException e) {
+                    sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED
+                            + "[HorizonDebug] 坐标必须是数字：" + args[4] + " " + args[5] + " " + args[6]));
+                    return;
+                }
+            }
+            String result = FakePlayerFactory.spawn(server, name, dim, x, y, z);
+            sender.addChatMessage(new ChatComponentText(result.startsWith("ok")
+                    ? EnumChatFormatting.GREEN + "[HorizonDebug] " + result
+                    : EnumChatFormatting.RED + "[HorizonDebug] 失败：" + result));
+            return;
+        }
+        if ("despawn".equals(action)) {
+            if (args.length < 3) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED
+                        + "[HorizonDebug] 用法：/horizondebug bot despawn <name>|all"));
+                return;
+            }
+            if ("all".equalsIgnoreCase(args[2])) {
+                List<String> names = FakePlayerFactory.names();
+                for (String name : names) {
+                    FakePlayerFactory.despawn(server, name);
+                }
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.GREEN
+                        + "[HorizonDebug] 已登出 " + names.size() + " 个假玩家"));
+                return;
+            }
+            String result = FakePlayerFactory.despawn(server, botName(args[2]));
+            sender.addChatMessage(new ChatComponentText(result.startsWith("ok")
+                    ? EnumChatFormatting.GREEN + "[HorizonDebug] " + result
+                    : EnumChatFormatting.RED + "[HorizonDebug] 失败：" + result));
+            return;
+        }
+        if ("say".equals(action)) {
+            if (args.length < 4) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED
+                        + "[HorizonDebug] 用法：/horizondebug bot say <name> <text>"));
+                return;
+            }
+            StringBuilder sb = new StringBuilder();
+            for (int i = 3; i < args.length; i++) {
+                if (i > 3) sb.append(' ');
+                sb.append(args[i]);
+            }
+            String result = FakePlayerFactory.say(botName(args[2]), sb.toString());
+            sender.addChatMessage(new ChatComponentText(result.startsWith("ok") || result.startsWith("queued")
+                    ? EnumChatFormatting.GREEN + "[HorizonDebug] " + result
+                    : EnumChatFormatting.RED + "[HorizonDebug] 失败：" + result));
+            return;
+        }
+        if (BOT_ACTIONS.contains(action)) {
+            if (args.length < 3) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED
+                        + "[HorizonDebug] 用法：/horizondebug bot " + action + " <name> ..."));
+                return;
+            }
+            String[] rest = new String[args.length - 2];
+            rest[0] = botName(args[2]);
+            for (int i = 3; i < args.length; i++) {
+                rest[i - 2] = args[i];
+            }
+            String result = FakePlayerActions.handle(action, rest);
+            sendResult(sender, result);
+            return;
+        }
+        sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + getCommandUsage(sender)));
+    }
+
+    /** {@code bot <action> ...} 可用的动作名（与 {@link FakePlayerActions} 对应） */
+    private static final Set<String> BOT_ACTIONS = new HashSet<String>(Arrays.asList(
+            "state", "inv", "hand", "move", "stop", "tp", "jump", "sneak", "sprint",
+            "look", "dig", "place", "use", "attack", "give", "cmd"));
+
+    /** 统一回显：{@code ok} 开头绿字，其余红字 */
+    private void sendResult(ICommandSender sender, String result) {
+        boolean ok = result != null && (result.startsWith("ok") || result.startsWith("queued"));
+        sender.addChatMessage(new ChatComponentText((ok
+                ? EnumChatFormatting.GREEN + "[HorizonDebug] "
+                : EnumChatFormatting.RED + "[HorizonDebug] 失败：") + result));
+    }
+
+    /** 名称补前缀：用户可写 {@code 1} 或 {@code Bot_1}，最终都是 {@code Bot_1} */
+    private String botName(String raw) {
+        String prefix = HorizonDebug.botPrefix == null ? "" : HorizonDebug.botPrefix;
+        if (prefix.isEmpty() || raw.startsWith(prefix)) return raw;
+        return prefix + raw;
     }
 
     // ------------------------------------------------------------ say
