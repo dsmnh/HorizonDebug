@@ -76,11 +76,22 @@ Horizon 生态的调试功能独立仓库：把 AEMobile 客户端、服务端�
     I:max=10             # 同时在线上限
     S:prefix=Bot_        # 名称前缀，便于业务模组与真实玩家区分
     B:invulnerable=true  # 免伤害与免饥饿
+    B:auto-op=true       # 登录即给 OP，登出收回（业务命令要权限 2）
 ```
+
+`auto-op` 让假玩家能直接跑 `/aemobile`、`/cofh` 这类权限 2 的命令，省掉手工
+`op`。授权走 `ServerConfigurationManager.func_152605_a`（addOp），登出走
+`func_152610_b`（removeOp），所以 `ops.json` 只在进程被强杀时才可能残留。
+公开服应与 `bot.enabled` 一起关掉。
 
 命令：`/horizondebug bot spawn <name> [dim] [x y z]`、`despawn <name>|all`、`list`、
 `say <name> <text>`，以及动作 `state` / `inv` / `hand` / `move` / `stop` / `tp` / `jump` /
-`sneak` / `sprint` / `look` / `dig` / `place` / `use` / `attack` / `give` / `cmd`。
+`sneak` / `sprint` / `look` / `dig` / `place` / `use` / `attack` / `give` / `cmd` /
+`op` / `deop` / `respawn`。
+
+`respawn` 走「登出再登录」而不是 `C16PacketClientStatus`：1.7.10 的 PERFORM_RESPAWN
+分支在血量仍大于 0 时直接返回，被 `/kill` 的假玩家血量虽满但 `isDead` 为真，
+只有重新登录才能恢复可用状态。
 
 聊天走非主线程投递：Crucible（Cauldron 系）要求在异步线程触发 `AsyncPlayerChatEvent`，
 主线程直接调用会被拒绝并抛 `IllegalStateException`，故 `say` 交给独立守护线程执行，
@@ -131,14 +142,17 @@ op 一览：
   `server.tps` 返回总览与逐世界 MSPT/TPS/实体/区块；`server.players` 把在线者分成
   `real` 与 `bots` 两组，便于脚本断言「真玩家进了服」或「假玩家都在线」。
 - 服务端假玩家：`bot.spawn`、`bot.despawn`、`bot.list`、`bot.spawnmany`（一次拉起
-  `count` 个，参数 `prefix`/`count`/可选 `dim`/`x`/`y`/`z`）、`bot.say` 与全部 bot 动作。
+  `count` 个，参数 `prefix`/`count`/可选 `dim`/`x`/`y`/`z`）、`bot.op`/`bot.deop`、
+  `bot.respawn`、`bot.say` 与全部 bot 动作。
   `bot.cmd` 会把命令的回显一并带回（`result.detail` 是首行，`result.lines` 是其余各行），
   所以能直接读到 `/gt chunks`、`/aemobile` 这类命令的输出，而不是只拿到一个返回码。
 - 客户端：`ping`、`state`、`scan`、`inv`、`keys`、`shot`、`screen`、`open`、`click`、
   `clickat`、`close`、`events`、`events-clear`、`key`、`press`、`release`、`hotbar`、`look`、
   `turn`、`dig`、`place`、`use`、`attack`、`chat`、`cmd`、`connect`、`script`、
-  `script-stop`、`script-status`。`inv` 读背包，`keys` 打出当前键位绑定的键码，
-  用它能查出本机整合包把「前进」改到了哪个键。
+  `script-stop`、`script-status`、`chatlog`、`chatjson`。`inv` 读背包，`keys` 打出
+  当前键位绑定的键码，用它能查出本机整合包把「前进」改到了哪个键。`chatlog`
+  返回最近若干条聊天（纯文本），`chatjson` 多带一份原始 JSON 组件，二者都只读
+  客户端本地缓存（上限 120 条），不依赖服务端。
 
 动作脚本为时间轴数组，每步只允许一个动作键（`at` 除外），`at` 为相对毫秒：
 
@@ -179,6 +193,8 @@ python tools/hdebug.py srv-tail 20     # 或 cli-tail / srv-raw / cli-raw
 python tools/hscenario.py tools/scenarios/bot-basic.json      # 假玩家基础动作
 python tools/hscenario.py tools/scenarios/client-basic.json   # 客户端操控基础
 python tools/hscenario.py tools/scenarios/cross-e2e.json      # 假玩家与真客户端并存
+python tools/hscenario.py tools/scenarios/business-aemobile.json  # 业务命令：权限、TPS、维度、重生
+python tools/hscenario.py tools/scenarios/business-chat.json      # 业务广播落到真客户端聊天栏
 ```
 
 每步只做一件事：`srv` / `cli`（op + args）或 `sleep`（毫秒）。`expect` 是断言列表，
@@ -189,8 +205,11 @@ python tools/hscenario.py tools/scenarios/cross-e2e.json      # 假玩家与真�
  "expect":[{"path":"result.detail","contains":"sneaking=true"}]}
 ```
 
-`--json` 输出完整报告（含每条响应），便于脚本二次处理。仓储内三个场景覆盖假玩家
-基本动作、客户端观测与截图、以及两侧并存的端到端链路。
+`--json` 输出完整报告（含每条响应），便于脚本二次处理。仓储内五个场景覆盖假玩家
+基本动作、客户端观测与截图、两侧并存的端到端链路，以及两条业务链路：
+`business-aemobile` 验证权限门（无 OP 被拒 → `bot.op` 放行 → `bot.deop` 再拒）、
+TPS 与维度报表、重生；`business-chat` 验证 `/aemobile say` 的广播确实出现在真客户端
+聊天栏，而 `/aemobile debug chat` 的注入只回 `seq`（走 App 聊天平面，不进游戏内聊天栏）。
 
 ## mod：构建
 

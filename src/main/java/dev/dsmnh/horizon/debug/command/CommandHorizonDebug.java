@@ -60,7 +60,8 @@ public class CommandHorizonDebug extends CommandBase {
                 + " | bot sneak|sprint <name> [on|off] | bot look <name> <yaw> <pitch>"
                 + " | bot dig <name> <x> <y> <z> [force] | bot place|use <name> <x> <y> <z> [face]"
                 + " | bot attack <name> <目标名|实体ID|nearest> | bot give <name> <物品> [数量] [meta]"
-                + " | bot cmd <name> <命令...>";
+                + " | bot cmd <name> <命令...>"
+                + " | bot op|deop <name> | bot respawn <name>";
     }
 
     /** 对所有人可见；管理子命令在 {@link #processCommand} 里单独检查权限 2 */
@@ -229,7 +230,7 @@ public class CommandHorizonDebug extends CommandBase {
     /** {@code bot <action> ...} 可用的动作名（与 {@link FakePlayerActions} 对应） */
     private static final Set<String> BOT_ACTIONS = new HashSet<String>(Arrays.asList(
             "state", "inv", "hand", "move", "stop", "tp", "jump", "sneak", "sprint",
-            "look", "dig", "place", "use", "attack", "give", "cmd"));
+            "look", "dig", "place", "use", "attack", "give", "cmd", "op", "deop", "respawn"));
 
     /** 统一回显：{@code ok} 开头绿字，其余红字 */
     private void sendResult(ICommandSender sender, String result) {

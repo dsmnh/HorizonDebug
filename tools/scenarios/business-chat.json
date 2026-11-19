@@ -1,0 +1,117 @@
+{
+  "name": "业务聊天：注入到真客户端",
+  "steps": [
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    },
+    {
+      "srv": "bot.spawn",
+      "args": {
+        "name": "chat",
+        "dim": 0
+      }
+    },
+    {
+      "sleep": 1500
+    },
+    {
+      "cli": "chatlog",
+      "args": {
+        "count": 5
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ],
+      "note": "先确认客户端通道可用"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "chat",
+        "command": "aemobile say horizon-biz-broadcast"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "已广播"
+        }
+      ],
+      "note": "服务端业务广播"
+    },
+    {
+      "sleep": 1500
+    },
+    {
+      "cli": "chatlog",
+      "args": {
+        "count": 8
+      },
+      "expect": [
+        {
+          "path": "result.items",
+          "contains": "horizon-biz-broadcast"
+        }
+      ],
+      "note": "真客户端必须收到广播"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "chat",
+        "command": "aemobile debug chat Bot_chat horizon-biz-inject"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "已注入"
+        },
+        {
+          "path": "result.lines.0",
+          "contains": "seq="
+        }
+      ],
+      "note": "业务侧聊天注入：走 App 聊天平面，不进游戏内聊天栏"
+    },
+    {
+      "sleep": 1500
+    },
+    {
+      "cli": "chatlog",
+      "args": {
+        "count": 8
+      },
+      "expect": [
+        {
+          "path": "result.items",
+          "contains": "horizon-biz-broadcast"
+        }
+      ],
+      "note": "广播仍然在最近 8 条里（注入走 App 平面，不进游戏内聊天栏）"
+    },
+    {
+      "cli": "chatjson",
+      "args": {
+        "count": 3
+      },
+      "expect": [
+        {
+          "path": "result.count",
+          "eq": 3
+        }
+      ],
+      "note": "组件 JSON 视图（颜色/悬停/点击）"
+    },
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    }
+  ]
+}

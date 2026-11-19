@@ -87,6 +87,10 @@ public final class FakePlayerActions {
             if ("attack".equals(action)) return attack(bot, args);
             if ("give".equals(action)) return give(bot, args);
             if ("cmd".equals(action)) return command(bot, args);
+            if ("op".equals(action) || "deop".equals(action)) {
+                return FakePlayerFactory.setOp(MinecraftServer.getServer(), name, "op".equals(action));
+            }
+            if ("respawn".equals(action)) return respawn(bot);
         } catch (Throwable t) {
             return "internal: " + describe(t);
         }
@@ -325,6 +329,31 @@ public final class FakePlayerActions {
         String label = itemText(stack);
         boolean ok = bot.player.inventory.addItemStackToInventory(stack);
         return "ok: " + bot.name + " give " + label + " -> " + (ok ? "已放入背包" : "背包已满");
+    }
+
+    /**
+     * 死亡后原地重生。
+     *
+     * <p>原版的重生入口是客户端发 {@code C16PacketClientStatus(PERFORM_RESPAWN})}，
+     * 而 {@code NetHandlerPlayServer.processClientStatus} 在血量仍大于 0 时直接返回——
+     * 假玩家被杀后血量会被服务端复位，这条路径不会触发。因此改成「登出再按原坐标登录」，
+     * 效果等于重生，且沿用已验证过的登录链路。
+     */
+    private static String respawn(FakePlayerFactory.Bot bot) {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null) return "not-ready: 服务器未就绪";
+        String name = bot.name;
+        int dim = bot.player.dimension;
+        double x = bot.player.posX;
+        double y = bot.player.posY;
+        double z = bot.player.posZ;
+        String gone = FakePlayerFactory.despawn(server, name);
+        if (!gone.startsWith("ok")) return gone;
+        String back = FakePlayerFactory.spawn(server, name, Integer.valueOf(dim),
+                Double.valueOf(x), Double.valueOf(y), Double.valueOf(z));
+        if (!back.startsWith("ok")) return back;
+        return "ok: " + name + " 已重生 dim=" + dim
+                + " pos=" + round(x) + "," + round(y) + "," + round(z);
     }
 
     private static String command(FakePlayerFactory.Bot bot, String[] args) {

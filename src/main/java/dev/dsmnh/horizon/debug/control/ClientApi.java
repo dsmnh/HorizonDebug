@@ -223,6 +223,12 @@ public final class ClientApi {
         if ("shot".equals(lower) || "screenshot".equals(lower)) {
             return detail(ClientActions.shot(mc, Json.str(args, "name", null)));
         }
+        if ("chatlog".equals(lower)) {
+            return chatLog(args, false);
+        }
+        if ("chatjson".equals(lower)) {
+            return chatLog(args, true);
+        }
         if ("inv".equals(lower) || "inventory".equals(lower)) return detail(ClientActions.inventory(mc));
         if ("keys".equals(lower)) return detail(ClientActions.keys(mc));
         if ("screen".equals(lower)) return detail(ClientActions.screen(mc));
@@ -327,6 +333,23 @@ public final class ClientApi {
             return Json.obj("client_result", Integer.valueOf(r), "command", "/" + line);
         }
         throw new ApiException("UNKNOWN_OP", "未知 op：" + op);
+    }
+
+    /**
+     * 最近收到的聊天。
+     *
+     * <p>{@code chatlog} 给纯文本（不含颜色码），{@code chatjson} 给组件 JSON——
+     * GTNHChat 的颜色、悬停与点击只在 JSON 里，用文本视图核对不了。
+     */
+    private static Object chatLog(Map<String, Object> args, boolean json) {
+        Integer n = Json.integer(args, "count");
+        java.util.List<dev.dsmnh.horizon.debug.debug.ClientChatLog.Entry> list =
+                dev.dsmnh.horizon.debug.debug.ClientChatLog.recent(n == null ? 20 : n.intValue());
+        java.util.List<Object> items = new java.util.ArrayList<Object>();
+        for (dev.dsmnh.horizon.debug.debug.ClientChatLog.Entry one : list) {
+            items.add(json ? one.json : one.text);
+        }
+        return Json.obj("count", Integer.valueOf(items.size()), "items", items);
     }
 
     private static Object detail(String result) {

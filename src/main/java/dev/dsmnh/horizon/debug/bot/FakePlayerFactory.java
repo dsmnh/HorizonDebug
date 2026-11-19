@@ -153,6 +153,10 @@ public final class FakePlayerFactory {
             // 只挡伤害，不改游戏模式：测试仍需正常挖掘与交互
             player.capabilities.disableDamage = true;
         }
+        if (dev.dsmnh.horizon.debug.HorizonDebug.botAutoOp) {
+            // 业务命令（/aemobile、/cofh 等）要权限 2，没有 OP 就没法验证业务链路
+            server.getConfigurationManager().func_152605_a(profile);
+        }
 
         Bot bot = new Bot(name, player, net, handler, channel);
         bot.drain();
@@ -166,6 +170,8 @@ public final class FakePlayerFactory {
         Bot bot = BOTS.remove(name.toLowerCase(Locale.ROOT));
         if (bot == null) return "not-found: " + name;
         try {
+            // 先摘 OP 再登出：auto-op 授予的权限不该留在 ops.json 里
+            server.getConfigurationManager().func_152610_b(bot.player.getGameProfile());
             server.getConfigurationManager().playerLoggedOut(bot.player);
         } catch (Throwable t) {
             return "logged-out-failed: " + describe(t);
@@ -178,6 +184,29 @@ public final class FakePlayerFactory {
         bot.drain();
         bot.channel.close();
         return "ok: " + name;
+    }
+
+    /**
+     * 给假玩家授权或收回 OP（对应原版 {@code /op} 与 {@code /deop}）。
+     *
+     * <p>登录时会按 {@code [bot] auto-op} 自动授权，这个入口用于手动干预：
+     * 验证无权限路径时先收回，验证业务命令时再授予。
+     *
+     * @return {@code ok: ...} 或错误描述
+     */
+    public static synchronized String setOp(MinecraftServer server, String name, boolean grant) {
+        Bot bot = BOTS.get(name.toLowerCase(Locale.ROOT));
+        if (bot == null) return "not-found: " + name;
+        try {
+            if (grant) {
+                server.getConfigurationManager().func_152605_a(bot.player.getGameProfile());
+            } else {
+                server.getConfigurationManager().func_152610_b(bot.player.getGameProfile());
+            }
+        } catch (Throwable t) {
+            return "op-failed: " + describe(t);
+        }
+        return "ok: " + bot.name + (grant ? " 已获得 OP" : " 已收回 OP");
     }
 
     /**

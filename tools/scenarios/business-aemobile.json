@@ -1,0 +1,124 @@
+{
+  "name": "业务命令：权限与状态面",
+  "steps": [
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    },
+    {
+      "srv": "bot.spawn",
+      "args": {
+        "name": "biz",
+        "dim": 0
+      },
+      "note": "拉起假玩家（auto-op 默认开启）"
+    },
+    {
+      "srv": "bot.deop",
+      "args": {
+        "name": "biz"
+      },
+      "note": "收回 OP，验证无权限路径"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "biz",
+        "command": "aemobile stats"
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        },
+        {
+          "path": "result.lines.0",
+          "contains": "权限不足"
+        }
+      ],
+      "note": "无 OP 时业务命令必须被拒"
+    },
+    {
+      "srv": "bot.op",
+      "args": {
+        "name": "biz"
+      },
+      "note": "重新授权"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "biz",
+        "command": "aemobile stats"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "uptimeSec"
+        }
+      ],
+      "note": "有 OP 后 /aemobile stats 返回运行统计"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "biz",
+        "command": "aemobile tps"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "AEMobile TPS"
+        }
+      ],
+      "note": "TPS 对照表"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "biz",
+        "command": "aemobile dims"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "维度清单"
+        }
+      ],
+      "note": "维度清单"
+    },
+    {
+      "srv": "bot.respawn",
+      "args": {
+        "name": "biz"
+      },
+      "expect": [
+        {
+          "path": "ok",
+          "eq": true
+        }
+      ],
+      "note": "原地重生"
+    },
+    {
+      "srv": "bot.state",
+      "args": {
+        "name": "biz"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "dead=false"
+        }
+      ]
+    },
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    }
+  ]
+}

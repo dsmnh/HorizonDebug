@@ -41,6 +41,16 @@ public class HorizonDebug {
     public static boolean botInvulnerable = true;
 
     /**
+     * 假玩家登录时是否自动授予 OP（config 的 {@code [bot] auto-op}，默认开启）。
+     *
+     * <p>业务命令（{@code /aemobile}、{@code /cofh} 等）要求权限 2，假玩家没有 OP 就什么都验证不了。
+     * 授权走 {@code ServerConfigurationManager.addOp}，登出时自动 {@code removeOp}，
+     * 因此 {@code ops.json} 不会残留条目——除非进程被强杀。默认开启，公开服请连同
+     * {@code [bot] enabled} 一起关闭。
+     */
+    public static boolean botAutoOp = true;
+
+    /**
      * JSONL 调试 API 开关（config 的 {@code [debug] jsonApi}）。开启后监听
      * {@code dumps/horizondebug/api.jsonl}，把每行请求转成 {@code api-out.jsonl} 的响应；
      * 依赖 {@code [debug] enabled}，两者都开才生效。
@@ -87,6 +97,9 @@ public class HorizonDebug {
                 "Name prefix for fake players, used to recognise and clean them up.");
         botInvulnerable = config.getBoolean("invulnerable", "bot", true,
                 "Keep fake players from starving or dying to fall damage during tests.");
+        botAutoOp = config.getBoolean("auto-op", "bot", true,
+                "Give fake players OP on login so business commands (/aemobile, /cofh) can be tested."
+                        + " OP is removed again on logout, so ops.json stays clean unless the process is killed.");
         jsonApi = config.getBoolean("jsonApi", "debug", true,
                 "Enable the JSONL debug API (dumps/horizondebug/api.jsonl -> api-out.jsonl)."
                         + " Requires [debug] enabled=true.");
