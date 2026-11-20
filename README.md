@@ -201,12 +201,21 @@ python tools/hscenario.py tools/scenarios/business-me.json        # ME 设备登
 python tools/hscenario.py tools/scenarios/business-eu.json        # GT 全局能量网络入网与退网
 ```
 
-每步只做一件事：`srv` / `cli`（op + args）或 `sleep`（毫秒）。`expect` 是断言列表，
-每项含点号路径 `path` 与 `eq` / `contains` / `exists` 之一：
+每步只做一件事：`srv` / `cli`（op + args）、`sleep`（毫秒），或 `wait`（轮询到条件成立）。
+`expect` 是断言列表，每项含点号路径 `path` 与 `eq` / `contains` / `exists` 之一：
 
 ```json
 {"srv":"bot.state","args":{"name":"Bot_sc1"},
  "expect":[{"path":"result.detail","contains":"sneaking=true"}]}
+```
+
+跨秒的事件（等客户端进服、等世界加载、等异步命令回显）用 `wait` 而不是固定 `sleep`：
+它按 `interval` 反复请求同一个 op，直到 `expect` 全部通过才继续，超时则记该步失败并给出
+最后一次响应的差异。`timeout` 是该步的总预算（毫秒），默认 30000。
+
+```json
+{"wait":{"cli":"state","timeout":120000,"interval":1500,
+         "expect":[{"path":"result.detail","contains":"name="}]}}
 ```
 
 `--json` 输出完整报告（含每条响应），便于脚本二次处理。仓储内九个场景覆盖假玩家

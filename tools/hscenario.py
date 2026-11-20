@@ -19,7 +19,12 @@
       ]
     }
 
-每个步骤只做一件事：`srv`（服务端）、`cli`（客户端）、`sleep`（毫秒）。
+每个步骤只做一件事：`srv`（服务端）、`cli`（客户端）、`sleep`（毫秒），
+或 `wait`（轮询直到断言通过，用于等玩家进服、等世界加载这类跨秒事件）：
+
+    {"wait": {"cli": "state", "timeout": 60000, "interval": 1000,
+              "expect": [{"path": "result.detail", "contains": "name="}]}}
+
 `expect` 是断言列表，每项含 `path`（点号路径，支持 result.detail 这类嵌套）以及
 `eq` / `contains` / `exists` 之一；任一断言失败即记该步失败并继续跑完，
 最后按失败数量返回退出码（0 全通过，1 有失败）。
@@ -84,6 +89,12 @@ def run(scenario: dict, timeout: float):
             time.sleep(ms / 1000.0)
             results.append({"step": label, "kind": "sleep", "ms": ms, "ok": True})
             continue
+        if "wait" in step:
+            entry = wait_step(label, step["wait"], timeout)
+            if not entry["ok"]:
+                failed += 1
+            results.append(entry)
+            continue
         side = "server" if "srv" in step else "client" if "cli" in step else None
         if side is None:
             results.append({"step": label, "ok": False, "error": "步骤既不是 srv/cli 也不是 sleep"})
@@ -110,6 +121,40 @@ def run(scenario: dict, timeout: float):
             failed += 1
         results.append(entry)
     return results, failed
+
+
+def wait_step(label: str, spec: dict, timeout: float) -> dict:
+    """反复请求某个 op，直到 expect 全部通过或超时；返回一步的结果"""
+    side = "server" if "srv" in spec else "client" if "cli" in spec else None
+    if side is None:
+        return {"step": label, "kind": "wait", "ok": False, "error": "wait 里既没有 srv 也没有 cli"}
+    op = spec["srv"] if side == "server" else spec["cli"]
+    args = spec.get("args") or {}
+    budget = float(spec.get("timeout", 30000))
+    interval = max(0.05, float(spec.get("interval", 500)) / 1000.0)
+    deadline = time.time() + budget / 1000.0
+    attempts = 0
+    fails = ["尚未执行"]
+    last = None
+    while True:
+        attempts += 1
+        last = hdebug.request(side, op, args, timeout)
+        if last is not None:
+            fails = check(last, spec.get("expect"))
+            if not fails and last.get("ok"):
+                return {"step": label, "kind": "wait", "side": side, "op": op, "ok": True,
+                        "attempts": attempts, "response": last}
+            if not fails and not last.get("ok"):
+                fails = ["响应 ok=false：" + str((last.get("error") or {}).get("message", ""))]
+        else:
+            fails = [f"{timeout:.0f}s 内没有响应"]
+        if time.time() + interval > deadline:
+            entry = {"step": label, "kind": "wait", "side": side, "op": op, "ok": False,
+                     "attempts": attempts, "fails": fails, "error": f"{budget:.0f}ms 内未满足条件"}
+            if last is not None:
+                entry["response"] = last
+            return entry
+        time.sleep(interval)
 
 
 def main() -> int:

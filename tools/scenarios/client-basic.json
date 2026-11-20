@@ -12,13 +12,18 @@
       ]
     },
     {
-      "cli": "state",
-      "expect": [
-        {
-          "path": "result.detail",
-          "contains": "name="
-        }
-      ]
+      "wait": {
+        "cli": "state",
+        "timeout": 120000,
+        "interval": 1500,
+        "expect": [
+          {
+            "path": "result.detail",
+            "contains": "name="
+          }
+        ]
+      },
+      "note": "等客户端进服完成（未进服时 state 回 NOT_IN_GAME）"
     },
     {
       "cli": "keys",
