@@ -111,10 +111,10 @@
       "expect": [
         {
           "path": "result.lines.0",
-          "contains": "未连接"
+          "contains": "已连接"
         }
       ],
-      "note": "当前无节点凭证，属预期的离线态"
+      "note": "节点已注册时该行为已连接；尚无凭证的离线态报未连接，其余步骤不受影响"
     },
     {
       "srv": "bot.despawn",
