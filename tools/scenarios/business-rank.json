@@ -1,0 +1,200 @@
+{
+  "name": "业务：榜单记分板（scoreboard 目标/写入/累加/显示）",
+  "timeout": 25,
+  "steps": [
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    },
+    {
+      "srv": "bot.spawn",
+      "args": {
+        "name": "rk1"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "Bot_rk1"
+        }
+      ]
+    },
+    {
+      "srv": "bot.spawn",
+      "args": {
+        "name": "rk2"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "Bot_rk2"
+        }
+      ]
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_rk1",
+        "command": "scoreboard objectives remove horizon_rank"
+      },
+      "note": "清场：目标可能不存在，返回 0 属正常"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_rk1",
+        "command": "scoreboard objectives add horizon_rank dummy 队内榜"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ],
+      "note": "建榜（dummy 判据 + 显示名）"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_rk1",
+        "command": "scoreboard players set Bot_rk1 horizon_rank 42"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ]
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_rk2",
+        "command": "scoreboard players set Bot_rk2 horizon_rank 7"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ]
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_rk1",
+        "command": "scoreboard players list Bot_rk1"
+      },
+      "expect": [
+        {
+          "path": "result.lines.1",
+          "contains": "42"
+        }
+      ],
+      "note": "读榜：第 2 行是「- 队内榜: 42 (horizon_rank)」"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_rk1",
+        "command": "scoreboard players add Bot_rk1 horizon_rank 8"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ],
+      "note": "累加 42+8"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_rk1",
+        "command": "scoreboard players list Bot_rk1"
+      },
+      "expect": [
+        {
+          "path": "result.lines.1",
+          "contains": "50"
+        }
+      ]
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_rk1",
+        "command": "scoreboard players remove Bot_rk1 horizon_rank 7"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ],
+      "note": "1.7.10 的 players 只有 set/add/remove/reset/list，没有 operation；用 remove 验证减值"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_rk1",
+        "command": "scoreboard players list Bot_rk1"
+      },
+      "expect": [
+        {
+          "path": "result.lines.1",
+          "contains": "43"
+        }
+      ],
+      "note": "50 - 7 = 43"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_rk1",
+        "command": "scoreboard objectives setdisplay sidebar horizon_rank"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ],
+      "note": "挂到侧栏显示"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_rk1",
+        "command": "scoreboard objectives list"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ]
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_rk1",
+        "command": "scoreboard objectives remove horizon_rank"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ],
+      "note": "收尾：删榜"
+    },
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    }
+  ]
+}

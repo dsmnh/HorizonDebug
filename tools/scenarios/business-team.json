@@ -1,0 +1,212 @@
+{
+  "name": "业务：ServerUtilities 组队创建/邀请/加入/退出",
+  "timeout": 25,
+  "steps": [
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    },
+    {
+      "srv": "bot.spawn",
+      "args": {
+        "name": "tm1"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "Bot_tm1"
+        }
+      ]
+    },
+    {
+      "srv": "bot.spawn",
+      "args": {
+        "name": "tm2"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "Bot_tm2"
+        }
+      ]
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm1",
+        "command": "team leave"
+      },
+      "note": "清场：上次运行可能残留队伍归属（返回 0 表示本来就不在组里）"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm2",
+        "command": "team leave"
+      },
+      "note": "同上"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm1",
+        "command": "team delete teamz"
+      },
+      "note": "删除上次可能残留的同名队伍（不存在时返回 0）"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm1",
+        "command": "team create teamz"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        },
+        {
+          "path": "result.lines.0",
+          "contains": "teamz"
+        }
+      ],
+      "note": "队长建队"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm1",
+        "command": "team info teamz"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "teamz"
+        },
+        {
+          "path": "result.lines.3",
+          "contains": "Bot_tm1"
+        }
+      ]
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm2",
+        "command": "team get Bot_tm2"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "无组"
+        }
+      ],
+      "note": "加入前：无组"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm1",
+        "command": "team status_for teamz Bot_tm2 invited"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "invited"
+        }
+      ],
+      "note": "1.7.10 SU 无 invite 子命令，用 status_for 置 invited"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm2",
+        "command": "team join teamz"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ],
+      "note": "被邀请者接受"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm2",
+        "command": "team get Bot_tm2"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "Bot_tm1"
+        }
+      ],
+      "note": "加入后：队伍显示名为队长名"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm1",
+        "command": "team info teamz"
+      },
+      "expect": [
+        {
+          "path": "result.lines.3",
+          "contains": "Bot_tm2"
+        }
+      ],
+      "note": "队长侧成员列表含新成员"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm2",
+        "command": "team leave"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ]
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm1",
+        "command": "team info teamz"
+      },
+      "expect": [
+        {
+          "path": "result.lines.3",
+          "contains": "Bot_tm1"
+        }
+      ],
+      "note": "退出后成员行只剩队长"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_tm1",
+        "command": "team delete teamz"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ],
+      "note": "收尾：解散队伍"
+    },
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    }
+  ]
+}

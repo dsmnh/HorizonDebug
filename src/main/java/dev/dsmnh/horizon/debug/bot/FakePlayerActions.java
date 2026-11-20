@@ -5,7 +5,9 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.play.server.S02PacketChat;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.IChatComponent;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
@@ -367,13 +369,15 @@ public final class FakePlayerActions {
         if (line.startsWith("/")) line = line.substring(1);
         MinecraftServer server = MinecraftServer.getServer();
         if (server == null) return "not-ready: 服务器未就绪";
-        // 命令回显只写进发送者的聊天栏，executeCommand 的返回值是命令自身的结果码，
-        // 所以要包一层捕获器，把输出行原样带回来
-        CaptureSender capture = new CaptureSender(bot.player);
-        int r = server.getCommandManager().executeCommand(capture, line);
+        // 命令回显只写进发送者的聊天栏，executeCommand 的返回值是命令自身的结果码。
+        // 不能用包装型 ICommandSender：GT 的 /team 等命令走 getCommandSenderAsPlayer(sender)，
+        // 包装器不是 EntityPlayer 会被判成「没有指定玩家」。因此改用真实玩家执行，再从它的
+        // 出站队列里把 S02PacketChat 取回来——addChatMessage 最终就是发这个包。
+        bot.drain(); // 先清掉历史包，避免旧聊天混进来
+        int r = server.getCommandManager().executeCommand(bot.player, line);
         StringBuilder out = new StringBuilder();
         out.append("ok: ").append(bot.name).append(" 执行 /").append(line).append(" -> 返回值 ").append(r);
-        List<String> lines = capture.lines();
+        List<String> lines = drainChat(bot);
         int shown = Math.min(lines.size(), MAX_CMD_LINES);
         for (int i = 0; i < shown; i++) {
             out.append('\n').append("  ").append(lines.get(i));
@@ -382,6 +386,63 @@ public final class FakePlayerActions {
             out.append('\n').append("  … 其余 ").append(lines.size() - shown).append(" 行省略");
         }
         return out.toString();
+    }
+
+    /**
+     * 取聊天包里的文本组件。
+     *
+     * <p>1.7.10 运行在 GTNH 下是 notch 名，{@code func_148915_c} 在 reobf 后未必保留，
+     * 直接调用会 NoSuchMethodError，因此按「先找返回 IChatComponent 的无参方法、
+     * 再找 IChatComponent 字段」的顺序反射。
+     */
+    private static IChatComponent chatOf(Object packet) {
+        Class<?> type = packet.getClass();
+        try {
+            java.lang.reflect.Method[] methods = type.getMethods();
+            for (int i = 0; i < methods.length; i++) {
+                java.lang.reflect.Method m = methods[i];
+                if (m.getParameterTypes().length != 0) continue;
+                if (!IChatComponent.class.isAssignableFrom(m.getReturnType())) continue;
+                m.setAccessible(true);
+                Object value = m.invoke(packet);
+                if (value instanceof IChatComponent) return (IChatComponent) value;
+            }
+        } catch (Throwable ignored) {
+            // 落到字段查找
+        }
+        try {
+            java.lang.reflect.Field[] fields = type.getDeclaredFields();
+            for (int i = 0; i < fields.length; i++) {
+                java.lang.reflect.Field f = fields[i];
+                if (!IChatComponent.class.isAssignableFrom(f.getType())) continue;
+                f.setAccessible(true);
+                Object value = f.get(packet);
+                if (value instanceof IChatComponent) return (IChatComponent) value;
+            }
+        } catch (Throwable ignored) {
+            // 无可用字段
+        }
+        return null;
+    }
+
+    /** 取走假玩家出站队列里的聊天包，返回其中的纯文本行 */
+    private static List<String> drainChat(FakePlayerFactory.Bot bot) {
+        List<String> lines = new ArrayList<String>();
+        int guard = 0;
+        while (guard++ < 20000) {
+            Object packet;
+            try {
+                packet = bot.channel.readOutbound();
+            } catch (Throwable t) {
+                break;
+            }
+            if (packet == null) break;
+            if (!(packet instanceof S02PacketChat)) continue;
+            IChatComponent component = chatOf(packet);
+            if (component == null) continue;
+            lines.add(component.getUnformattedText());
+        }
+        return lines;
     }
 
     // ------------------------------------------------------------ 工具

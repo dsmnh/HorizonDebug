@@ -1,0 +1,126 @@
+{
+  "name": "业务：ME 设备登记（dsmnhmobile me register/unregister/list）",
+  "timeout": 25,
+  "steps": [
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    },
+    {
+      "srv": "bot.spawn",
+      "args": {
+        "name": "me1"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "Bot_me1"
+        }
+      ]
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_me1",
+        "command": "dsmnhmobile me unregister horizon-me-1"
+      },
+      "note": "清场：上次运行可能残留同名设备"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_me1",
+        "command": "dsmnhmobile me list"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "已登记 ME 设备"
+        }
+      ],
+      "note": "登记前：清单只有标题"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_me1",
+        "command": "dsmnhmobile me register horizon-me-1"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ],
+      "note": "坐标取假玩家当前位置（出生点附近 -143,73,-175）"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_me1",
+        "command": "dsmnhmobile me list"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "horizon-me-1"
+        },
+        {
+          "path": "result.lines.0",
+          "contains": "0:-143,73,-175"
+        }
+      ],
+      "note": "清单格式：设备ID(dim:x,y,z)"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_me1",
+        "command": "dsmnhmobile me unregister horizon-me-1"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "返回值 1"
+        }
+      ],
+      "note": "注销设备"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_me1",
+        "command": "dsmnhmobile me list"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "exists": true
+        }
+      ],
+      "note": "注销后清单回到只有标题"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_me1",
+        "command": "dsmnhmobile status"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "未连接"
+        }
+      ],
+      "note": "当前无节点凭证，属预期的离线态"
+    },
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    }
+  ]
+}

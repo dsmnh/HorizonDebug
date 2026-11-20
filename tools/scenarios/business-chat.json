@@ -38,11 +38,11 @@
       },
       "expect": [
         {
-          "path": "result.lines.0",
+          "path": "result.lines",
           "contains": "已广播"
         }
       ],
-      "note": "服务端业务广播"
+      "note": "服务端业务广播；lines 首行是广播正文（假玩家自己也收到了），确认行在其后"
     },
     {
       "sleep": 1500
