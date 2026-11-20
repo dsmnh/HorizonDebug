@@ -9,15 +9,18 @@ Horizon 生态的调试功能独立仓库：把 AEMobile 客户端、服务端�
 | 产物 | 形态 | 内容 |
 |---|---|---|
 | `horizondebug` mod | Forge 1.7.10（服务端 + 客户端同一个 jar） | 文件命令桥（服务端 / 客户端两条通道）+ `/horizondebug` 诊断命令 + TPS/MSPT 采集 + 假玩家 + 客户端操控 + JSONL 调试 API |
-| `HorizonDebugBridge` | BungeeCord/HexaCord 插件（Java 8） | JSON TCP 调试桥：`exec` / `probe` / `status` / `servers` 四个诊断 op |
+| `HorizonDebugBridge` | BungeeCord/HexaCord 插件（Java 8） | JSON TCP 调试桥：`exec` / `probe` / `status` / `servers` / `players` 五个诊断 op |
 | `tools/debug_client.py` | Python 脚本 | 驱动文件命令桥与调试桥的命令行客户端 |
 | `tools/hdebug.py` | Python 脚本 | 驱动 JSONL 调试 API（假玩家与客户端操控）的命令行入口 |
+| `tools/hscenario.py` | Python 脚本 | 场景运行器：把一串请求写成 JSON 跑完并按断言判定 |
+| `tools/hperf.py` | Python 脚本 | 假玩家 MSPT 基线对比，按设计文档反目标口径判定 |
 
 ```
 ├── build.gradle 等          Forge mod 的 Gradle 工程（GTNH ExampleMod1.7.10 模板）
 ├── src/main/java/...        mod 源码（dev.dsmnh.horizon.debug）
 ├── bridge/                  BC 插件源码（dev.dsmnh.horizon.debug.bridge）+ build.ps1
-└── tools/                   调试客户端脚本（debug_client.py 文件桥；hdebug.py JSONL API）
+└── tools/                   调试脚本（debug_client.py 文件桥；hdebug.py JSONL API；
+                             hscenario.py 场景；hperf.py 性能基线；scenarios/ 仓储场景）
 ```
 
 ## mod：文件命令桥
@@ -58,7 +61,26 @@ Horizon 生态的调试功能独立仓库：把 AEMobile 客户端、服务端�
 | `biome` | 所在生物群系 |
 | `nei` | 反射调用 NEI 发送手持物品链接（未装 NEI 时返回错误） |
 
-客户端未进入游戏时只有 `connect` 可执行，其余返回 `not-in-game`。
+客户端未进入游戏时只有 `connect` 可执行，其余返回 `not-in-game`；
+`[control] enabled=false` 时操控类子命令一律返回 `disabled: config [control] enabled=false`。
+
+### 客户端操控命令（同一通道，需 `[control] enabled=true`）
+
+| 命令 | 作用 |
+|---|---|
+| `key <键名> [on\|off]` / `press <键名>` / `release <键名>` | 置位 / 按下 / 松开原版按键绑定 |
+| `hotbar <0-8>` | 切换快捷栏槽位 |
+| `look <yaw> <pitch>` | 绝对视角 |
+| `turn <dyaw> <dpitch>` | 相对转动 |
+| `lookat <x> <y> <z>` | 看向世界坐标 |
+| `dig [x y z]` / `place [x y z] [face]` / `use` / `attack [目标]` | 挖、放、右键、攻击（缺坐标时用准星目标） |
+| `shot <名字>` / `screenshot <名字>` | 截图到 `dumps/horizondebug/shots/screenshots/` |
+| `gui` / `screen` | 读当前界面与按钮清单 |
+| `inventory` / `keys` | 背包内容 / 当前键位绑定的键码 |
+| `click <id>` / `clickat <x> <y> [button]` | 按 id 点按钮 / 按界面坐标点 |
+| `open <inventory\|chat\|pause>` / `close` | 打开原版界面 / 关闭当前界面 |
+| `events [n]` | 读客户端事件环形缓冲（受伤/死亡/进出世界/界面开关/换维度） |
+| `script <JSON 数组>` / `script-stop` / `script-status` | 驱动时间轴动作脚本 |
 
 ### 世界显示名覆盖
 
@@ -88,6 +110,32 @@ Horizon 生态的调试功能独立仓库：把 AEMobile 客户端、服务端�
 `say <name> <text>`，以及动作 `state` / `inv` / `hand` / `move` / `stop` / `tp` / `jump` /
 `sneak` / `sprint` / `look` / `dig` / `place` / `use` / `attack` / `give` / `cmd` /
 `op` / `deop` / `respawn`。
+
+JSONL 里名字不必带前缀：`bot.spawn name=01` 会按 `[bot] prefix` 自动补成 `Bot_01`，
+已带前缀的名字原样使用（`bot.despawn name=all` 的清场判断在补前缀之前，不受影响）。
+
+| 动作 | 参数 | 说明 |
+|---|---|---|
+| `spawn` | `name`、可选 `dim`/`x`/`y`/`z` | 生成假玩家并完成登录 |
+| `despawn` | `name` 或 `all` | 登出并从在线列表移除 |
+| `spawnmany` | `prefix`、`count`、可选 `dim`/`x`/`y`/`z` | 一次拉起 `count` 个 |
+| `list` | 无 | 名字、维度、坐标 |
+| `say` | `name`、`text` | 异步投递到聊天 |
+| `op` / `deop` | `name` | 授予 / 收回 OP |
+| `respawn` | `name` | 登出再登录（等价重生） |
+| `state` | `name` | 坐标、朝向、血量、饥饿、手持、移动任务 |
+| `inv` / `hand` | `name` | 背包 / 手持物品 |
+| `move` | `name`、`forward`、可选 `strafe`/`ticks` | 按朝向推进，`ticks` 上限 1200 |
+| `stop` | `name` | 停止移动任务 |
+| `tp` | `name`、`x`/`y`/`z`、可选 `dim` | 跨维度传送 |
+| `jump` | `name` | 必须在落地状态 |
+| `sneak` / `sprint` | `name`、可选 `on`（默认 true） | 切换潜行 / 疾跑 |
+| `look` | `name`、`yaw`、`pitch` | pitch 夹到 -90~90 |
+| `dig` | `name`、`x`/`y`/`z`、可选 `force` | `force=true` 跳过工具与硬度判定 |
+| `place` / `use` | `name`、`x`/`y`/`z`、可选 `face`（默认 1） | 放置 / 右键使用 |
+| `attack` | `name`、`target`（`nearest` 或实体 ID / 玩家名） | 用当前物品攻击 |
+| `give` | `name`、`item`、可选 `count`/`meta` | 放进背包 |
+| `cmd` | `name`、`command` | 真实玩家执行，回显进 `result.lines` |
 
 `respawn` 走「登出再登录」而不是 `C16PacketClientStatus`：1.7.10 的 PERFORM_RESPAWN
 分支在血量仍大于 0 时直接返回，被 `/kill` 的假玩家血量虽满但 `isDead` 为真，
@@ -146,10 +194,11 @@ op 一览：
   `bot.respawn`、`bot.say` 与全部 bot 动作。
   `bot.cmd` 会把命令的回显一并带回（`result.detail` 是首行，`result.lines` 是其余各行），
   所以能直接读到 `/gt chunks`、`/aemobile` 这类命令的输出，而不是只拿到一个返回码。
-- 客户端：`ping`、`state`、`scan`、`inv`、`keys`、`shot`、`screen`、`open`、`click`、
-  `clickat`、`close`、`events`、`events-clear`、`key`、`press`、`release`、`hotbar`、`look`、
-  `turn`、`dig`、`place`、`use`、`attack`、`chat`、`cmd`、`connect`、`script`、
-  `script-stop`、`script-status`、`chatlog`、`chatjson`。`inv` 读背包，`keys` 打出
+- 客户端：`ping`、`state`、`scan`（`radius` 1–32，默认 8）、`inv`、`keys`、`shot`、`screen`、
+  `names`、`open`（`name` = `inventory`/`chat`/`pause`）、`click`、`clickat`、`close`、
+  `events`（`count` 默认 20）、`events-clear`、`key`、`press`、`release`、`hotbar`、`look`、
+  `turn`、`dig`、`place`、`use`、`attack`（`target` 默认 `crosshair`）、`chat`、`cmd`、
+  `connect`（`host`/`port`）、`script`、`script-stop`、`script-status`、`chatlog`、`chatjson`。`inv` 读背包，`keys` 打出
   当前键位绑定的键码，用它能查出本机整合包把「前进」改到了哪个键。`chatlog`
   返回最近若干条聊天（纯文本），`chatjson` 多带一份原始 JSON 组件，二者都只读
   客户端本地缓存（上限 120 条），不依赖服务端。
@@ -305,7 +354,11 @@ python tools/debug_client.py readsrv                # 读 cmd.out
 python tools/debug_client.py cli connect 127.0.0.1 25565
 python tools/debug_client.py readcli
 python tools/debug_client.py status                 # 调试桥自检
+python tools/debug_client.py servers                # 代理子服清单
+python tools/debug_client.py players                # 代理侧在线玩家
 python tools/debug_client.py probe                  # 探测 SU|TabHF 信道
+python tools/debug_client.py probe SU|TabHF --player=Steve
+python tools/debug_client.py bridge '{"op":"exec","player":"Steve","command":"help 1"}'
 ```
 
 ## tools/hperf.py
