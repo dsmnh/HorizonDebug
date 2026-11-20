@@ -308,6 +308,21 @@ python tools/debug_client.py status                 # 调试桥自检
 python tools/debug_client.py probe                  # 探测 SU|TabHF 信道
 ```
 
+## tools/hperf.py
+
+设计文档 §2 的反目标口径是「10 个假玩家时 MSPT 增幅 < 5」，本脚本把这条口径做成一条可重跑的命令：
+先清场并采一段空载基线，再 `bot.spawnmany` 拉起 N 个假玩家、稳定后二次采样，最后清场并给出
+增量与判定（不通过时退出码 1）。
+
+```bash
+python tools/hperf.py                         # 10 个假玩家、每档 5 次采样
+python tools/hperf.py --bots 10 --threshold 5 --json
+```
+
+gtnh1 实测（2026-11-20）：基线 MSPT 1.956 / TPS 20.00 → 10 个假玩家加载后 2.708 / TPS 20.00，
+增量 0.752 mspt，判定通过。`--warmup` 控制拉起后等待秒数，`--samples`/`--interval` 控制采样密度；
+`ticks` 不足 20 的早启动窗口会被自动跳过，避免把刚重置的统计窗口算进均值。
+
 ## 上线约束
 
 - 生产服（正式服）**不安装本 mod 与插件**；已安装的测试服转正式前，把 `[debug] enabled`
