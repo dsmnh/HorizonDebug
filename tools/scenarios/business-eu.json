@@ -1,0 +1,62 @@
+{
+  "name": "业务：GT 全局能量网络入网（eu.join 模板）",
+  "timeout": 25,
+  "steps": [
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    },
+    {
+      "srv": "bot.spawn",
+      "args": {
+        "name": "eu1"
+      },
+      "expect": [
+        {
+          "path": "result.detail",
+          "contains": "Bot_eu1"
+        }
+      ]
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_eu1",
+        "command": "gt global_energy_join Bot_eu1 horizon-eu-net"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "has joined"
+        },
+        {
+          "path": "result.lines.0",
+          "contains": "horizon-eu-net"
+        }
+      ],
+      "note": "契约 eu.join 的模板命令，入网成功会回 Success!"
+    },
+    {
+      "srv": "bot.cmd",
+      "args": {
+        "name": "Bot_eu1",
+        "command": "gt global_energy_join Bot_eu1 Bot_eu1"
+      },
+      "expect": [
+        {
+          "path": "result.lines.0",
+          "contains": "rejoined their own global energy network"
+        }
+      ],
+      "note": "退网：重新加入自己名下网络即恢复独立电网（回显 User … has rejoined their own global energy network.）"
+    },
+    {
+      "srv": "bot.despawn",
+      "args": {
+        "name": "all"
+      }
+    }
+  ]
+}

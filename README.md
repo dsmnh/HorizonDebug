@@ -198,6 +198,7 @@ python tools/hscenario.py tools/scenarios/business-chat.json      # 业务广播
 python tools/hscenario.py tools/scenarios/business-team.json      # ServerUtilities 组队：建队、邀请、加入、退出、解散
 python tools/hscenario.py tools/scenarios/business-rank.json      # 榜单记分板：建榜、写分、累加、侧栏显示
 python tools/hscenario.py tools/scenarios/business-me.json        # ME 设备登记：register / list / unregister
+python tools/hscenario.py tools/scenarios/business-eu.json        # GT 全局能量网络入网与退网
 ```
 
 每步只做一件事：`srv` / `cli`（op + args）或 `sleep`（毫秒）。`expect` 是断言列表，
@@ -208,7 +209,7 @@ python tools/hscenario.py tools/scenarios/business-me.json        # ME 设备登
  "expect":[{"path":"result.detail","contains":"sneaking=true"}]}
 ```
 
-`--json` 输出完整报告（含每条响应），便于脚本二次处理。仓储内八个场景覆盖假玩家
+`--json` 输出完整报告（含每条响应），便于脚本二次处理。仓储内九个场景覆盖假玩家
 基本动作、客户端观测与截图、两侧并存的端到端链路，以及五条业务链路：
 `business-aemobile` 验证权限门（无 OP 被拒 → `bot.op` 放行 → `bot.deop` 再拒）、
 TPS 与维度报表、重生；`business-chat` 验证 `/aemobile say` 的广播确实出现在真客户端
@@ -217,7 +218,9 @@ TPS 与维度报表、重生；`business-chat` 验证 `/aemobile say` 的广播�
 再由被邀请者 `team join`（直接 join 会假成功：返回 0 且回显「已是组员」但队伍未变）；
 `business-rank` 用原版记分板覆盖榜单链路（1.7.10 的 `/scoreboard players` 只有
 set/add/remove/reset/list，没有 `operation`）；`business-me` 用 `/dsmnhmobile me` 做
-ME 设备登记，坐标取执行者当前位置、清单格式为 `设备ID(dim:x,y,z)`（需服端装 HorizonModServer）。
+ME 设备登记，坐标取执行者当前位置、清单格式为 `设备ID(dim:x,y,z)`（需服端装 HorizonModServer）；
+`business-eu` 验证契约 `eu.join` 的模板命令 `/gt global_energy_join <玩家> <网络>`——入网回
+`Success! … has joined …`，退网（重新加入自己名下网络）回 `has rejoined their own global energy network.`。
 
 ## mod：构建
 
